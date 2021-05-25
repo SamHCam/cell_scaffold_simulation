@@ -66,7 +66,7 @@ class Scaffold:
         # Calculates the maximum cells in the scaffold and maximum cells in a single pore
         cell_volume = 4/3*np.pi*(cell_diameter/2)**3                        # Calulates the volume of cells in the scaffold (assuming spherical) (µm^3)
         occupiable_pore_volume = packing_density*pore_volume                # Amount of volume in the pore that can be occupied by cells based on a packing density (µm^3)
-        cell_max_per_pore =  m.floor(occupiable_pore_volume/cell_volume)     # Maximum number of cells per pore
+        cell_max_per_pore =  m.floor(occupiable_pore_volume/cell_volume)    # Maximum number of cells per pore
         max_cells = pore_number*cell_max_per_pore                           # Maximum number of cells that can occupy the scaffold
 
         # Returns scaffold characteristics
@@ -331,7 +331,7 @@ class Scaffold:
             available_area = 1
         
         # Calculate ligand max and ligand number
-        ligand_max = available_area*(np.pi*(self.cell_diameter/2)**2 - np.pi*(self.cell_diameter/2 - 4) ** 2) * 500
+        ligand_max = available_area*(np.pi*(self.cell_diameter/2)**2 - np.pi*(self.cell_diameter/2 - 8) ** 2) * 500
         ligand_num = self.ligand_factor*ligand_max*tau/(5.7499*10**3)
 
         # --------------------------------------------------------------------------

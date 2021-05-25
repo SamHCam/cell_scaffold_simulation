@@ -3,7 +3,7 @@ import random as r
 from scaffold import Scaffold
 
 # --------------------------------------------------------------------------
-# Helper Functions
+# Helper Method
 # --------------------------------------------------------------------------
 def write_data(data_list, file_name):
     with open(file_name, 'a', newline='') as csvFile:
@@ -22,6 +22,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_f
     data = []
 
     # Data headers to CSV file
+    header[0].append(scaffold.pore_array[1] - scaffold.pore_array[0])
     write_data(header, file_name)
 
     # Generate cells in scaffold
@@ -94,4 +95,3 @@ for rr in [0]:
                     # Run Simulation
                     # --------------------------------------------------------------------------
                     simulation(file_header, csv_file_name, env_1, initial_cell_count, time_step, simulation_time, writing_frequency, recording_frequency, replication_probability)
-                    # test 2
