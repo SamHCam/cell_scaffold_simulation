@@ -60,38 +60,40 @@ for rr in [0]:
             for pd in [100]:
                 # Modifies Scaffold Stiffness (kPa)
                 for ss in [6.3]:
+                    # Modifies Porosity (%)
+                    for ps in [0.91]:
 
-                    # Simulation Parameters
-                    time_step = 0.1                     # Amount of time the simulation "steps" forward each time to perform migration and/or replication
+                        # Simulation Parameters
+                        time_step = 0.1                     # Amount of time the simulation "steps" forward each time to perform migration and/or replication
 
-                    # Scaffold Parameters:
-                    dimension = 1500                    # Side length of cubical Scaffold (µm)
-                    porosity = 0.91                     # Measure of 'empty' volume in scaffold
-                    pore_diameter = pd                  # Diameter length of pores in scaffold (µm)
-                    scaffold_stiffness = ss             # Scaffold Stiffness (kPa)
-                    ligand_factor = lf                  # Ligand Factor (%)
+                        # Scaffold Parameters:
+                        dimension = 1500                    # Side length of cubical Scaffold (µm)
+                        porosity = ps                     # Measure of 'empty' volume in scaffold
+                        pore_diameter = pd                  # Diameter length of pores in scaffold (µm)
+                        scaffold_stiffness = ss             # Scaffold Stiffness (kPa)
+                        ligand_factor = lf                  # Ligand Factor (%)
 
-                    # Cell parameters:
-                    cell_diameter = cd                                                              # Cell diameter (µm)
-                    initial_cell_count = round(0.5 * dimension**3 * (3.25*10**6)/(1*10**12))        # Initial seeding of scaffold with cells
-                    replication_probability = rr                                                    # Probability that a cell will replicate
+                        # Cell parameters:
+                        cell_diameter = cd                                                              # Cell diameter (µm)
+                        initial_cell_count = round(0.5 * dimension**3 * (3.25*10**6)/(1*10**12))        # Initial seeding of scaffold with cells
+                        replication_probability = rr                                                    # Probability that a cell will replicate
 
-                    # Simulation Parameters:
-                    simulation_time = 2000              # Time length of simulation (hour)
-                    writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
-                    recording_frequency = 50            # Frequency of how often the program records data (hours per record)
-                    packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
-                    csv_file_name = "Sim_" + str(scaffold_stiffness) + "kPa_" + str(pore_diameter) + "PDµm_" + str(cell_diameter) + "CDµm_" + str(replication_probability) + "RP%_" + str(ligand_factor) + "LF%" + ".csv"
-                    file_header =[["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "X", "Y", "Z"]]
-
-
-                    # --------------------------------------------------------------------------
-                    # Generate scaffold environment
-                    # --------------------------------------------------------------------------
-                    env_1 = Scaffold(dimension, porosity, pore_diameter, packing_density/100, cell_diameter, scaffold_stiffness*10**3, ligand_factor)
+                        # Simulation Parameters:
+                        simulation_time = 2000              # Time length of simulation (hour)
+                        writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
+                        recording_frequency = 50            # Frequency of how often the program records data (hours per record)
+                        packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
+                        csv_file_name = "Sim_" + str(scaffold_stiffness) + "kPa_" + str(pore_diameter) + "PDµm_" + str(cell_diameter) + "CDµm_" + str(replication_probability) + "RP%_" + str(ligand_factor) + "LF%_" + str(porosity) + "PS%" + ".csv"
+                        file_header =[["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "X", "Y", "Z"]]
 
 
-                    # --------------------------------------------------------------------------
-                    # Run Simulation
-                    # --------------------------------------------------------------------------
-                    simulation(file_header, csv_file_name, env_1, initial_cell_count, time_step, simulation_time, writing_frequency, recording_frequency, replication_probability)
+                        # --------------------------------------------------------------------------
+                        # Generate scaffold environment
+                        # --------------------------------------------------------------------------
+                        env_1 = Scaffold(dimension, porosity, pore_diameter, packing_density/100, cell_diameter, scaffold_stiffness*10**3, ligand_factor)
+
+
+                        # --------------------------------------------------------------------------
+                        # Run Simulation
+                        # --------------------------------------------------------------------------
+                        simulation(file_header, csv_file_name, env_1, initial_cell_count, time_step, simulation_time, writing_frequency, recording_frequency, replication_probability)
