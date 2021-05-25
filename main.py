@@ -59,7 +59,7 @@ for rr in [0]:
             # Modifies Pore Diameter (µm)
             for pd in [100]:
                 # Modifies Scaffold Stiffness (kPa)
-                for ss in [5]:
+                for ss in [6.3]:
 
                     # Simulation Parameters
                     time_step = 0.1                     # Amount of time the simulation "steps" forward each time to perform migration and/or replication
