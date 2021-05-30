@@ -55,13 +55,13 @@ class Scaffold:
         # Calculates the number of pores based on the pore volume avilable
         # --------------------------------------------------------------------------
         pore_number = m.floor(scaffold_porous_volume/pore_volume)  # Ensures only that all pores are uniform and have the same volume
-        pore_per_side = m.floor(pore_number ** (1/3))              # Calculates the number of pores per side length, also ensures the scaffold is cubical in nature
-        pore_number = pore_per_side**3                             # Re-calculates new pore number to maintain cubical scaffold
+        pores_per_side = m.floor(pore_number ** (1/3))              # Calculates the number of pores per side length, also ensures the scaffold is cubical in nature
+        pore_number = pores_per_side**3                             # Re-calculates new pore number to maintain cubical scaffold
 
         # --------------------------------------------------------------------------
         # Create side-length array
         # --------------------------------------------------------------------------
-        pore_array = np.linspace(0, dimension, num=pore_per_side).tolist()       # Creates an array that represents the coordinates of all side lengths in the scaffold
+        pore_array = np.linspace(0, dimension, num=pores_per_side).tolist()       # Creates an array that represents the coordinates of all side lengths in the scaffold
 
         # Calculates the maximum cells in the scaffold and maximum cells in a single pore
         cell_volume = 4/3*np.pi*(cell_diameter/2)**3                        # Calulates the volume of cells in the scaffold (assuming spherical) (µm^3)
@@ -118,7 +118,7 @@ class Scaffold:
             data.append(cell.write_data(self.pore_array, seeded_time))
 
 
-    def migration_replication(self, data, t, ts, tf, rf, rep_prob):
+    def migration_replication(self, data, t, ts, tf, rf, rep_rate):
         """TODO"""
 
         # Ensure unbiased cellular migration and replication
@@ -129,7 +129,7 @@ class Scaffold:
 
             # Neighbor capacity checks whether neighboring pores in regards to the pore the cell is in are full. X, Y, and Z in both positive and negative direction are accounted by conditions 1-6
             # while the pore's capacity, in which the current cell is in, is accounted by condition 7
-            neighbor_capacity = self.neighbor_conditional_check(cell)[:]
+            neighbor_capacity = self.__neighbor_conditional_check(cell)[:]
 
             # If all pores, including the pore the cell is in, are full then no movement and no replication occurs. Only recording of relevant cell properties to the data array is performed.
             if (neighbor_capacity[0] and neighbor_capacity[1] and neighbor_capacity[2] and neighbor_capacity[3] and neighbor_capacity[4] and neighbor_capacity[5] and neighbor_capacity[6]) == True:
@@ -139,17 +139,17 @@ class Scaffold:
             else:
                 if (neighbor_capacity[0] and neighbor_capacity[1] and neighbor_capacity[2] and neighbor_capacity[3] and neighbor_capacity[4] and neighbor_capacity[5]) == True:
                     rp = 0
-                    if rep_prob != 0:
-                        if round(1/rep_prob) == 1:
+                    if rep_rate != 0:
+                        if round(1/rep_rate) == 1:
                             rp = 1
                         else:
-                            rp = r.randint(1, round(1/rep_prob))
+                            rp = r.randint(1, round(1/rep_rate))
                     if rp != 1:
                         if (t % rf == 0 or t == tf):
                             data.append(cell.write_data(self.pore_array, t))
                     # Replication of cell occurs if replication condition is achieved
                     else:
-                        new_daughter_cell = self.new_daughter_cell(cell, t)
+                        new_daughter_cell = self.__new_daughter_cell(cell, t)
 
                         # New cell with an identical pore location to its parent is added to the list of cell objects
                         self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
@@ -169,18 +169,18 @@ class Scaffold:
 
                     # Perform replication which is dependent on the replication probability
                     rp = 0
-                    if rep_prob != 0:
-                        if round(1/rep_prob) == 1:
+                    if rep_rate != 0:
+                        if round(1/rep_rate) == 1:
                             rp = 1
                         else:
-                            rp = r.randint(1, round(1/rep_prob))
+                            rp = r.randint(1, round(1/rep_rate))
                     if rp != 1:
                         if (t % rf == 0 or t == tf):
                             data.append(cell.write_data(self.pore_array, t))
                     else:
                         # Generate a new daughter cell and perform migration on it
-                        new_daughter_cell = self.new_daughter_cell(cell, t)
-                        daughter_neighbor_conditions = self.neighbor_conditional_check(new_daughter_cell)
+                        new_daughter_cell = self.__new_daughter_cell(cell, t)
+                        daughter_neighbor_conditions = self.__neighbor_conditional_check(new_daughter_cell)
                         self.__perform_migration(new_daughter_cell, daughter_neighbor_conditions, ts, True)
 
                         # Replicated cell must migrate to exist
@@ -226,7 +226,7 @@ class Scaffold:
         # Calculate probability to migrate in chosen direction
         # --------------------------------------------------------------------------
         # Calculate distance 
-        cell_velocity = self.__calculate_cell_velocity(cell, migration_direction)           # Cell velocity in chosen direction (µm/s)
+        f_trac, cell_velocity = self.__calculate_cell_velocity(cell, migration_direction)           # Cell velocity in chosen direction (µm/s)
         distance_between_pores = self.pore_array[1] - self.pore_array[0]                    # Distance between neighboring pores (equidistant)
         cell_distance_traveled = cell_velocity * ts * 3600                                  # Distance cell can travel (µm)
 
@@ -241,6 +241,8 @@ class Scaffold:
 
         # Migrate in chosen direction based on migration probability
         if probability_of_migration > random_migration_number:
+            # Update cell's traction force
+            cell.f_trac = f_trac
            
             # Update number of moves made
             cell.moves_made += 1
@@ -341,10 +343,12 @@ class Scaffold:
         n = 55                                      # Viscosity (Pa-s)
         c = 6 * np.pi * self.cell_diameter/2        # Constant, dependent on cell shape (µm)
 
-        return ((c1 * self.scaffold_stiffness * ligand_num)/(c * n))  # Cell velocity to planned pore to migrate to (µm/s)
+        f_traction = c1 * self.scaffold_stiffness * ligand_num
+
+        return f_traction, (f_traction/(c * n))  # Cell velocity to planned pore to migrate to (µm/s)
 
 
-    def neighbor_conditional_check(self, cell_to_check):
+    def __neighbor_conditional_check(self, cell_to_check):
         """TODO"""
 
         # Generate cell conditions
@@ -386,7 +390,7 @@ class Scaffold:
         return neighbor_conditions
 
 
-    def new_daughter_cell(self, parent_cell, time_in):
+    def __new_daughter_cell(self, parent_cell, time_in):
         """TODO"""
 
         daughter_cell = self.Cell(parent_cell.cell_diameter, time_in)
@@ -429,8 +433,9 @@ class Scaffold:
             self.moves_made = 0
             self.time = time
             self.cell_diameter = cell_diameter
+            self.f_trac = 0
 
 
         # Generates data row regarding relevant cell parameters
         def write_data(self, pore_array, current_time):
-            return [current_time, self.ID, self.generation, self.moves_made, round(pore_array[self.position[0]], 3), round(pore_array[self.position[1]], 3), round(pore_array[self.position[2]], 3)]
+            return [current_time, self.ID, self.generation, self.moves_made, self.f_trac, round(pore_array[self.position[0]], 3), round(pore_array[self.position[1]], 3), round(pore_array[self.position[2]], 3)]

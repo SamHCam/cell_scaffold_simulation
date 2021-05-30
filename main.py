@@ -6,17 +6,20 @@ from scaffold import Scaffold
 # Helper Method
 # --------------------------------------------------------------------------
 def write_data(data_list, file_name):
+    """TODO"""
+
     with open(file_name, 'a', newline='') as csvFile:
         for i in range(len(data_list)):
             writer = csv.writer(csvFile)
             writer.writerow(data_list[i])
-    csvFile.close()  
+    csvFile.close()
 
 
 # --------------------------------------------------------------------------
 # Run Simulation
 # --------------------------------------------------------------------------
 def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_final, writing_frequency, recording_frequency, replication_probability):
+    """TODO"""
     
     # Data Storage
     data = []
@@ -50,18 +53,18 @@ def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_f
 # Simulation Characteristics
 # --------------------------------------------------------------------------
 
-# Modifies Replication Probability (s^-1)
-for rr in [0]:
+# Modifies Replication Rate (s^-1)
+for rr in [1E-7]:
     # Modifies Cell Diameter (µm)
     for cd in [35]:
         # Modifies Ligand Factor (%)
-        for lf in [1]:
+        for lf in [100]:
             # Modifies Pore Diameter (µm)
             for pd in [100]:
                 # Modifies Scaffold Stiffness (kPa)
                 for ss in [6.3]:
                     # Modifies Porosity (%)
-                    for ps in [0.91]:
+                    for ps in [91]:
 
                         # Simulation Parameters
                         time_step = 0.1                     # Amount of time the simulation "steps" forward each time to perform migration and/or replication
@@ -83,14 +86,14 @@ for rr in [0]:
                         writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
                         recording_frequency = 50            # Frequency of how often the program records data (hours per record)
                         packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
-                        csv_file_name = "Sim_" + str(scaffold_stiffness) + "kPa_" + str(pore_diameter) + "PDµm_" + str(cell_diameter) + "CDµm_" + str(replication_probability) + "RP%_" + str(ligand_factor) + "LF%_" + str(porosity) + "PS%" + ".csv"
-                        file_header =[["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "X", "Y", "Z"]]
+                        csv_file_name = "Sim_" + str(scaffold_stiffness) + "kPa_" + str(pore_diameter) + "PDµm_" + str(cell_diameter) + "CDµm_" + str(replication_probability) + "RP_" + str(ligand_factor) + "LF%_" + str(porosity) + "PS%" + ".csv"
+                        file_header =[["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "Traction Force (N)", "X (um)", "Y (um)", "Z (um)"]]
 
 
                         # --------------------------------------------------------------------------
                         # Generate scaffold environment
                         # --------------------------------------------------------------------------
-                        env_1 = Scaffold(dimension, porosity, pore_diameter, packing_density/100, cell_diameter, scaffold_stiffness*10**3, ligand_factor)
+                        env_1 = Scaffold(dimension, porosity/100, pore_diameter, packing_density/100, cell_diameter, scaffold_stiffness*10**3, ligand_factor/100)
 
 
                         # --------------------------------------------------------------------------
