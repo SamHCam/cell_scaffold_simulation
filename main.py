@@ -34,15 +34,18 @@ def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_f
     # Start of time increment stepping in the simulation
     time = time_step
     while time <= time_final:
+        print(time)
 
         # Migration and replication of scaffold
-        scaffold.migration_replication(data, time, time_step, time_final, recording_frequency, replication_probability)
+        scaffold.migration_replication(data, time, time_step, time_final, recording_frequency, replication_probability * 3600 * time_step)
 
         if (time % writing_frequency == 0 or time == time_final):
             # Record data in list
             write_data(data, file_name)
             # Clear out data list after recording
             data = []
+
+        print(scaffold.cell_count)
 
         # Add time step to increment simulation
         time += time_step # hours
@@ -54,7 +57,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_f
 # --------------------------------------------------------------------------
 
 # Modifies Replication Rate (s^-1)
-for rr in [1E-7]:
+for rr in [1E-6, 1.5E-6, 2E-6, 2.5E-6]:
     # Modifies Cell Diameter (µm)
     for cd in [35]:
         # Modifies Ligand Factor (%)
@@ -62,7 +65,7 @@ for rr in [1E-7]:
             # Modifies Pore Diameter (µm)
             for pd in [100]:
                 # Modifies Scaffold Stiffness (kPa)
-                for ss in [6.3]:
+                for ss in [4]:
                     # Modifies Porosity (%)
                     for ps in [91]:
 
@@ -71,7 +74,7 @@ for rr in [1E-7]:
 
                         # Scaffold Parameters:
                         dimension = 1500                    # Side length of cubical Scaffold (µm)
-                        porosity = ps                     # Measure of 'empty' volume in scaffold
+                        porosity = ps                       # Measure of 'empty' volume in scaffold
                         pore_diameter = pd                  # Diameter length of pores in scaffold (µm)
                         scaffold_stiffness = ss             # Scaffold Stiffness (kPa)
                         ligand_factor = lf                  # Ligand Factor (%)
@@ -79,7 +82,7 @@ for rr in [1E-7]:
                         # Cell parameters:
                         cell_diameter = cd                                                              # Cell diameter (µm)
                         initial_cell_count = round(0.5 * dimension**3 * (3.25*10**6)/(1*10**12))        # Initial seeding of scaffold with cells
-                        replication_probability = rr                                                    # Probability that a cell will replicate
+                        replication_probability = rr                                                    # Probability that a cell will replicate (s^-1)
 
                         # Simulation Parameters:
                         simulation_time = 2000              # Time length of simulation (hour)
