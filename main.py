@@ -57,7 +57,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, time_step, time_f
 # --------------------------------------------------------------------------
 
 # Modifies Replication Rate (s^-1)
-for rr in [1E-6, 1.5E-6, 2E-6, 2.5E-6]:
+for rr in [1E-6]:
     # Modifies Cell Diameter (µm)
     for cd in [35]:
         # Modifies Ligand Factor (%)
@@ -65,7 +65,7 @@ for rr in [1E-6, 1.5E-6, 2E-6, 2.5E-6]:
             # Modifies Pore Diameter (µm)
             for pd in [100]:
                 # Modifies Scaffold Stiffness (kPa)
-                for ss in [4]:
+                for ss in [6.3]:
                     # Modifies Porosity (%)
                     for ps in [91]:
 
@@ -85,7 +85,7 @@ for rr in [1E-6, 1.5E-6, 2E-6, 2.5E-6]:
                         replication_probability = rr                                                    # Probability that a cell will replicate (s^-1)
 
                         # Simulation Parameters:
-                        simulation_time = 2000              # Time length of simulation (hour)
+                        simulation_time = 50              # Time length of simulation (hour)
                         writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
                         recording_frequency = 50            # Frequency of how often the program records data (hours per record)
                         packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
