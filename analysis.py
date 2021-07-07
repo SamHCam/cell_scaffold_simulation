@@ -66,7 +66,7 @@ def extract_file_average_cell_speed(files):
     """
 
     data = []
-    data.append(["Stiffness (kPa)", "Pore Diameter (um)", "Cell Diameter (um)", "Replication Probability (s^-1)", "Ligand Factor (%)", "Porosity (%)", "Average Cell Speed (um/hr)", "Standard Deviation"])
+    data.append(["Stiffness (kPa)", "Pore Diameter (um)", "Cell Diameter (um)", "Replication Rate (s^-1)", "Ligand Factor (%)", "Porosity (%)", "Average Cell Speed (um/hr)", "Standard Deviation"])
     for file in files:
         df = pd.read_csv(file)
 
@@ -121,9 +121,11 @@ def extract_each_cell_speed(file):
         file: file to extract data from
 
     Returns:
-        None, writes data to the file cell_speeds_over_time.csv
+        None, writes data to the file "individual_cell_speeds.csv"
     """
 
+    data = []
+    data.append(["Time (hour)", "Cell Generation", "Average Cell Speed (um/hr)", "Standard Deviation"])
     org_df = pd.read_csv(file)
     for gen in range(1,4):
         df = org_df[org_df["Cell Generation"] == gen]
@@ -134,8 +136,6 @@ def extract_each_cell_speed(file):
         # Extract all unique cell IDs
         cell_ids = set(df["Cell ID"])
 
-        data = []
-        data.append(["Time (hour)", "Cell Generation", "Average Cell Speed (um/hr)"])
         for t in range(200, 2200, 200):
             print(t)
             cell_speeds = []
@@ -144,32 +144,83 @@ def extract_each_cell_speed(file):
                 cell_id_data = df[df["Cell ID"] == id]
                 
                 # Find the time in which the cell entered the simulation
-                cell_time_in = list(cell_id_data["Time (hr)"])[0]
+                cell_time_in = list(cell_id_data["Time (hour)"])[0]
 
                 if cell_time_in >= t:
                     continue
 
                 # Find the interested time
-                cell_time_interested_data = cell_id_data[cell_id_data["Time (hr)"] == t]
+                cell_time_interested_data = cell_id_data[cell_id_data["Time (hour)"] == t]
 
 
                 # Find the number of moves the cell moves over the entire simulation
-                cell_moves = list(cell_time_interested_data["Cell Moves"])[0]
+                cell_moves = list(cell_time_interested_data["Number of Cell Moves"])[0]
 
                 if (t - cell_time_in) != 0:
                     average_speed = (cell_moves * distance_between_pores)/(t - cell_time_in)
                     cell_speeds.append(average_speed)
                 else:
                     cell_speeds.append(0)
-            data.append([t, gen, np.mean(cell_speeds)])
+            data.append([t, gen, np.mean(cell_speeds), np.std(cell_speeds)])
 
-        write_data(data, "individual_cell_speed.csv")
+        # Write data to file
+        write_data(data, "individual_cell_speeds.csv")
+
+        # Clear data for each generation
+        data = []
+
+
+# ------------------------------------------------------------------------------------------------
+# Extract Average Cell Speeds for one file at the end of the simulation
+# ------------------------------------------------------------------------------------------------
+def extract_cell_speed_end_simulation(file):
+    """Extract the cell speed of each individual cell from data written by the scaffold data structure
+
+    Args:
+        file: file to extract data from
+
+    Returns:
+        None, writes data to the file "end_simulation_cell_speeds.csv"
+    """
+
+
+    write_data([["Time (hour)", "Cell Generation", "Average Cell Speed (um/hr)"]], "end_simulation_cell_speeds.csv")
+    df = pd.read_csv(file)
+
+    # Find the distance between pores
+    distance_between_pores = float(list(df.columns)[-1])
+
+    # Extract all unique cell IDs
+    cell_ids = set(df["Cell ID"])
+
+    cell_speeds = []
+    for id in cell_ids:
+        # Extract all data for particular cell ID
+        cell_id_data = df[df["Cell ID"] == id]
+        
+        # Find the time in which the cell entered the simulation
+        cell_time_in = list(cell_id_data["Time (hour)"])[0]
+
+        # Find the interested time
+        cell_time_interested_data = cell_id_data[cell_id_data["Time (hour)"] == 2000]
+
+        # Find the number of moves the cell moves over the entire simulation
+        cell_moves = list(cell_time_interested_data["Number of Cell Moves"])[0]
+
+        if (2000 - cell_time_in) != 0:
+            average_speed = (cell_moves * distance_between_pores)/(2000 - cell_time_in)
+            cell_speeds.append(average_speed)
+        else:
+            cell_speeds.append(0)
+
+        # Write data to file
+        write_data([[2000, list(cell_time_interested_data["Cell Generation"])[0], np.mean(cell_speeds)]], "end_simulation_cell_speeds.csv")
 
 
 # ------------------------------------------------------------------------------------------------
 # Plot Line Graph
 # ------------------------------------------------------------------------------------------------
-def plot_chart(file, x_values, y_values, xlabel, ylabel, chart_name):
+def plot_generation_speeds_chart(file, x_values, y_values, xlabel, ylabel, chart_name):
     """Plots a line graph based on x_values and y_values
 
     Args:
@@ -185,8 +236,16 @@ def plot_chart(file, x_values, y_values, xlabel, ylabel, chart_name):
 
     df = pd.read_csv(file)
 
-    # Set figure size properties
-    plt.figure(figsize=[4.65, 5], dpi=2000)
+    # Modify the axis for inversion
+    ax = plt.gca()
+    ax.tick_params(width=2, length=5)
+
+    # Set figure size and dpi
+    fig = plt.figure(figsize=[4.65, 5], dpi=2000)
+    sp = fig.add_subplot(1, 1, 1)
+    # Set "spine" width
+    for axis in ['top','bottom','left','right']:
+        sp.spines[axis].set_linewidth(2)
 
     # Plot relevant data
     for i in range(1, 4):
@@ -194,19 +253,18 @@ def plot_chart(file, x_values, y_values, xlabel, ylabel, chart_name):
         x = list(gen_df[x_values])
         y = list(gen_df[y_values])
         sd = list(gen_df["Standard Deviation"])
-        plt.plot(x, y, label=str(i))
-        plt.errorbar(x,y,yerr=sd)
+        ax.errorbar(x,y,yerr=sd, label=str(i), capsize=8)
 
-    plt.legend(title="Cell Generation", fontsize=32)
+    # Set legend
+    plt.legend(title="Cell Generation", fontsize=16, title_fontsize=18, loc=1)
 
     # Set tick fonts
-    plt.xticks(fontsize=34)
-    plt.yticks(fontsize=34)
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
     
     # Set label fonts
-    plt.xlabel(xlabel, fontsize=40)
-    plt.ylabel(ylabel, fontsize=40)
-    plt.grid(True)
+    plt.xlabel(xlabel, fontsize=18)
+    plt.ylabel(ylabel, fontsize=18)
 
     # Show figure and save it
     plt.tight_layout()
@@ -297,7 +355,7 @@ def heat_map_cell_speeds(file, x_values, y_values, xlabel, ylabel, chart_name):
 # ------------------------------------------------------------------------------------------------
 # Plot Histogram
 # ------------------------------------------------------------------------------------------------
-def plot_histogram(file, xlabel, ylabel, bins, chart_name):
+def plot_histogram(file, xlabel, ylabel, bins, number_of_generations, chart_name):
     """Plots a histogram of cell speeds for all generations in file
 
     Args:
@@ -313,24 +371,45 @@ def plot_histogram(file, xlabel, ylabel, bins, chart_name):
 
     df = pd.read_csv(file)
 
+    # --------------------------------------
+    # Plot each generation
+    # --------------------------------------
+    # Store X and Y values
+    x_values = []
+    y_values = []
+    
+    for gen in range(1, number_of_generations+1):
+        cell_gen_df = df[df["Cell Generation"] == gen]
+        cell_gen_speeds = list(cell_gen_df["Average Cell Speed (um/hr)"])
+        [array, bins, patches] =plt.hist(cell_gen_speeds, weights=np.ones(len(cell_gen_speeds))/len(cell_gen_speeds), bins=bins, label=str(gen), histtype='step')
+        plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+        x_values.append(bins)
+        y_values.append(array)
+
     # -------------------------
     # Modify plot(s) and sizes
     # -------------------------
     # Set figure size and dpi
     fig = plt.figure(figsize=[4.65, 5], dpi=2000)
     sp = fig.add_subplot(1, 1, 1)
+
     # Set "spine" width
     for axis in ['top','bottom','left','right']:
         sp.spines[axis].set_linewidth(2)
 
-    # --------------------------------------
-    # Plot each generation
-    # --------------------------------------
-    number_of_generations = len(set(list(df["Cell Generation"])))
-    for gen in range(1, number_of_generations+1):
-        cell_gen_df = df[df["Cell Generation"] == gen]
-        cell_gen_speeds = list(cell_gen_df["Average Cell Speed (um/hr)"])
-        [array, bins, patches] =plt.hist(cell_gen_speeds, weights=np.ones(len(cell_gen_speeds))/len(cell_gen_speeds), bins=bins, label=str(gen), histtype='step')
+    # Modify the axis
+    ax = plt.gca()
+    ax.tick_params(width=2, length=5)
+    
+    # -------------------------
+    # Plot graph
+    # -------------------------
+    for i in range(len(x_values)):
+        plt.errorbar(x_values[i][1:], y_values[i], label=i+1, capsize=8)
+        plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
+    
+    # Set legend
+    plt.legend(title="Cell Generation", fontsize=16, title_fontsize=18, loc=1)
 
     # --------------------------------------
     # Modify X and Y axis label and properties
@@ -346,46 +425,9 @@ def plot_histogram(file, xlabel, ylabel, bins, chart_name):
     # Show figure and save it
     plt.tight_layout()
     plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
-    plt.grid(True)
     plt.legend(title="Cell Generation")
     plt.savefig(chart_name, box_inches="tight")
 
-# ------------------------------------------------------------------------------------------------
-# Plot Persistence Time
-# ------------------------------------------------------------------------------------------------
-def plot_persistence(file, gen_num, time, chart_name):
-    """Plots a histogram of cell speeds for all generations in file
-
-    Args:
-        file: file to extract data from
-        gen_num: number of generations to plot
-        time: interested time to look at persistence time
-
-    Returns:
-        None, saves figure to specified chart_name
-    """
-
-    # Read in data file
-    df = pd.read_csv(file)
-    df = df[df["Time (hour)"] == time]
-
-    # -------------------------
-    # Modify plot(s) and sizes
-    # -------------------------
-    # Set figure size and dpi
-    fig = plt.figure(figsize=[4.65, 5], dpi=2000)
-    sp = fig.add_subplot(1, 1, 1)
-    # Set "spine" width
-    for axis in ['top','bottom','left','right']:
-        sp.spines[axis].set_linewidth(2)
-
-    bg_counter = []
-    for i in range(1, gen_num+1):
-        gen_df = df[df["Cell Generation"] == i]
-        zero_move_df = gen_df[gen_df["Number of Cell Moves"] == 0]
-        bg_counter[i-1] = len(list(zero_move_df["Cell ID"]))
-
-    plt.bar(bg_counter)
 
 # --------------------------------------
 # Method Calls
@@ -400,7 +442,7 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Stiffness (kPa)", "Pore Diameter (um)", "Stiffness (kPa)", "Pore Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Stiffness - no rep.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Stiffness (kPa)", "Pore Diameter (um)", "Stiffness (kPa)", "Pore Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Stiffness - no rep.png")
 
 
 # Pore Diameter vs. Cell Diameter - with replication
@@ -413,7 +455,7 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Pore Diameter (um)", "Cell Diameter (um)", "Pore Diameter (µm)", "Cell Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Cell Diameter.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Pore Diameter (um)", "Cell Diameter (um)", "Pore Diameter (µm)", "Cell Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Cell Diameter.png")
 
 
 # Pore Diameter vs. Porosity - with replication
@@ -426,12 +468,12 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-#heat_map_cell_speeds("cell_speeds.csv", "Pore Diameter (um)", "Porosity (%)", "Pore Diameter (µm)", "Porosity (%)", "Heatmap - Cell Speed by Pore Diameter versus Porosity.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Pore Diameter (um)", "Porosity (%)", "Pore Diameter (µm)", "Porosity (%)", "Heatmap - Cell Speed by Pore Diameter versus Porosity.png")
 
 
 # Pore Diameter vs. Replication Rate
 # pore_diameter = [60, 80, 100, 120]
-# rep_rate = [1E-7, 1.5E-7, 2E-7, 2.5E-7]
+# rep_rate = [1E-7, 5E-7, 1E-6, 5E-6]
 # data_file_names = []
 # for p in pore_diameter:
 #         for r in rep_rate:
@@ -439,7 +481,7 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Pore Diameter (um)", "Porosity (%)", "Pore Diameter (µm)", "Porosity (%)", "Heatmap - Cell Speed by Pore Diameter versus Porosity.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Pore Diameter (um)", "Replication Rate (s^-1)", "Pore Diameter (µm)", "Replication Rate (s$^{-1}$)", "Heatmap - Cell Speed by Pore Diameter versus Replication Rate.png")
 
 
 # Stiffness vs. Pore Diameter - with replication
@@ -452,7 +494,7 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Stiffness (kPa)", "Pore Diameter (um)", "Stiffness (kPa)", "Pore Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Stiffness - with rep.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Stiffness (kPa)", "Pore Diameter (um)", "Stiffness (kPa)", "Pore Diameter (µm)", "Heatmap - Cell Speed by Pore Diameter versus Stiffness - with rep.png")
 
 
 # Stiffness vs. Cell Diameter - with replication
@@ -465,9 +507,9 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Stiffness (kPa)", "Cell Diameter (um)", "Stiffness (kPa)", "Cell Diameter (µm)", "Heatmap - Cell Speed by Stifffness versus Cell Diameter.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Stiffness (kPa)", "Cell Diameter (um)", "Stiffness (kPa)", "Cell Diameter (µm)", "Heatmap - Cell Speed by Stifffness versus Cell Diameter.png")
 
-# Stiffness vs. Cell Diameter - with replication
+# Stiffness vs. Ligand Factor - with replication
 # stiffness = [2, 4, 6, 8]
 # ligand_factor = [40, 60, 80, 100]
 # data_file_names = []
@@ -477,12 +519,12 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Stiffness (kPa)", "Ligand Factor (%)", "Stiffness (kPa)", "Ligand Factor (%)", "Heatmap - Cell Speed by Stifffness versus Ligand Factor.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Stiffness (kPa)", "Ligand Factor (%)", "Stiffness (kPa)", "Ligand Factor (%)", "Heatmap - Cell Speed by Stifffness versus Ligand Factor.png")
 
 
-# Stiffness vs. Cell Diameter - with replication
+# Stiffness vs. Replication Rate
 # stiffness = [2, 4, 6, 8]
-# rep_rate = [1E-7, 1.5E-7, 2E-7, 2.5E-7]
+# rep_rate = [1E-7, 5E-7, 1E-6, 5E-6]
 # data_file_names = []
 # for s in stiffness:
 #         for r in rep_rate:
@@ -490,4 +532,18 @@ def plot_persistence(file, gen_num, time, chart_name):
 
 # extract_file_average_cell_speed(data_file_names)
 
-# heat_map_cell_speeds("cell_speeds.csv", "Stiffness (kPa)", "Replication Probability (s^-1)", "Stiffness (kPa)", "Replication Rate (s$^{-1}$)", "Heatmap - Cell Speed by Stifffness versus Replication Rate.png")
+# heat_map_cell_speeds("overall_cell_speeds.csv", "Stiffness (kPa)", "Replication Rate (s^-1)", "Stiffness (kPa)", "Replication Rate (s$^{-1}$)", "Heatmap - Cell Speed by Stifffness versus Replication Rate.png")
+
+
+# Cell Speeds Over Time By Generation
+# file = "Sim_4kPa_100PDµm_35CDµm_5e-06RP_100LF%_91PS%.csv"
+# extract_each_cell_speed(file)
+
+# plot_generation_speeds_chart("individual_cell_speeds.csv", "Time (hour)", "Average Cell Speed (um/hr)", "Time (hour)", "Average Cell Speed (µm/hr)", "Line Graph - Average Speeds of Different Generations Over Time.png")
+
+
+# Histogram - Cell Speeds
+file = "Sim_6.3kPa_100PDµm_35CDµm_1e-05RP_100LF%_91PS%.csv"
+extract_cell_speed_end_simulation(file)
+
+plot_histogram("end_simulation_cell_speeds.csv", "Average Cell Speed (µm/hr)", "Percent of Cells (%)", [7, 8, 9, 10, 11, 12], 3, "Histogram - Distribution of Average Cell Speeds by Generation")

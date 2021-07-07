@@ -85,7 +85,7 @@ for rr in [1E-6]:
                         replication_probability = rr                                                    # Probability that a cell will replicate (s^-1)
 
                         # Simulation Parameters:
-                        simulation_time = 50              # Time length of simulation (hour)
+                        simulation_time = 2000              # Time length of simulation (hour)
                         writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
                         recording_frequency = 50            # Frequency of how often the program records data (hours per record)
                         packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
