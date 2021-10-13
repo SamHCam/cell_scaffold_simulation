@@ -105,5 +105,3 @@ for rr in [1E-6]:
                         # Run Simulation
                         # --------------------------------------------------------------------------
                         simulation(file_header, csv_file_name, env_1, initial_cell_count, time_step, simulation_time, writing_frequency, recording_frequency, replication_probability)
-
-                        # Test
