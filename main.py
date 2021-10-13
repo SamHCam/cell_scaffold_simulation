@@ -78,6 +78,7 @@ for rr in [1E-6]:
                         pore_diameter = pd                  # Diameter length of pores in scaffold (µm)
                         scaffold_stiffness = ss             # Scaffold Stiffness (kPa)
                         ligand_factor = lf                  # Ligand Factor (%)
+                        packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
 
                         # Cell parameters:
                         cell_diameter = cd                                                              # Cell diameter (µm)
@@ -88,7 +89,8 @@ for rr in [1E-6]:
                         simulation_time = 2000              # Time length of simulation (hour)
                         writing_frequency = 100             # Frequency of how often the program writes all stored data to the CSV (hours per write)
                         recording_frequency = 50            # Frequency of how often the program records data (hours per record)
-                        packing_density = 80                # Fraction of empty volume that can be occupied by cells (%)
+
+                        # Header information
                         csv_file_name = "Sim_" + str(scaffold_stiffness) + "kPa_" + str(pore_diameter) + "PDµm_" + str(cell_diameter) + "CDµm_" + str(replication_probability) + "RP_" + str(ligand_factor) + "LF%_" + str(porosity) + "PS%" + ".csv"
                         file_header =[["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "Traction Force (N)", "X (um)", "Y (um)", "Z (um)"]]
 
@@ -103,3 +105,5 @@ for rr in [1E-6]:
                         # Run Simulation
                         # --------------------------------------------------------------------------
                         simulation(file_header, csv_file_name, env_1, initial_cell_count, time_step, simulation_time, writing_frequency, recording_frequency, replication_probability)
+
+                        # Test
