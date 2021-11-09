@@ -5,8 +5,70 @@ import random as r
 
 class Scaffold:
     def __init__(self, dimension, porosity, pore_diameter, packing_density, cell_diameter, scaffold_stiffness,
+                 ligand_factor):
+        """Seven parameter constructor that defines a scaffold utilizing individual spherical pores.
+
+        :param dimension: side dimension of cubical scaffold (µm).
+        :param porosity: empty or void volume fraction of the scaffold (%).
+        :param pore_diameter: diameter of pores occupying scaffold (µm).
+        :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%)
+        :param cell_diameter: diameter of cells occupying scaffold (µm).
+        :param scaffold_stiffness: the Young's modulus of the scaffold.
+        :param ligand_factor: percentage of normal ligand percentage in the scaffold.
+        """
+        # --------------------------------------------------------------------------
+        # Tracks the number of cells in the scaffold, cell IDs in the scaffold, and the time elapsed in the scaffold
+        # --------------------------------------------------------------------------
+        self.__cell_count = 0
+        self.__cell_ID_counter = 1
+        self.__time = 0
+
+        # --------------------------------------------------------------------------
+        # Generate scaffold characteristics
+        # --------------------------------------------------------------------------
+        # Generates various scaffold characteristics from method parameters
+        cluster_array, pore_number, cluster_cell_max, scaffold_cell_max, pores_per_cluster = \
+            self.__generate_pore_scaffold_properties(dimension, porosity, pore_diameter, packing_density, cell_diameter)
+
+
+        # Member Variables
+        self.__pore_number = pore_number                    # The number of pores in the scaffold
+        self.__pore_diameter = pore_diameter                # The diameters of pores in the scaffold
+        self.__cell_diameter = cell_diameter                # The cell diameter of cells that can be seeded in
+                                                            # scaffold
+        self.__cluster_array = cluster_array                # An array that represents the coordinates of each
+                                                            # pore cluster along a scaffold side length to represent any
+                                                            # position in the scaffold
+        self.__cluster_cell_max = cluster_cell_max          # The maximum number of cells one pore cluster in the
+                                                            # scaffold can hold
+        self.__scaffold_cell_max = scaffold_cell_max        # The maximum number of cells the scaffold can hold
+        self.__scaffold_stiffness = scaffold_stiffness      # The scaffold stiffness (Pa)
+        self.__ligand_factor = ligand_factor                # The percent of normal ligand percentage
+
+        # --------------------------------------------------------------------------
+        # Generate the pores in the scaffold and assigns their positions
+        # --------------------------------------------------------------------------
+        # Number of clusters per scaffold side length
+        cluster_array_size = len(cluster_array)
+
+        # Generate the scaffold based on the number of clusters
+        self.scaffold = [[[self.Pore_cluster(None, 0, self.__cluster_cell_max, pore_diameter, pores_per_cluster)
+                           for x in range(cluster_array_size)]
+                          for y in range(cluster_array_size)]
+                         for z in range(cluster_array_size)]
+
+        # Assign each pore cluster a unique position within the scaffold
+        self.__assign_positions(cluster_array_size)
+
+        # --------------------------------------------------------------------------
+        # Initializes and stores cell objects that are in the scaffold
+        # --------------------------------------------------------------------------
+        self.cell_objs = []
+
+
+    def __init__(self, dimension, porosity, pore_diameter, packing_density, cell_diameter, scaffold_stiffness,
                  ligand_factor, pore_cluster_count):
-        """Seven parameter constructor that defines a scaffold utilizing clusters of spherical pores rather than
+        """Eight parameter constructor that defines a scaffold utilizing clusters of spherical pores rather than
         individual pores.
 
         :param dimension: side dimension of cubical scaffold (µm).
@@ -54,13 +116,13 @@ class Scaffold:
         cluster_array_size = len(cluster_array)
 
         # Generate the scaffold based on the number of clusters
-        self.scaffold = [[[self.Pore_cluster(None, 0, self.cluster_cell_max, pore_diameter, pores_per_cluster)
+        self.scaffold = [[[self.Pore_cluster(None, 0, self.__cluster_cell_max, pore_diameter, pores_per_cluster)
                            for x in range(cluster_array_size)]
                           for y in range(cluster_array_size)]
                          for z in range(cluster_array_size)]
 
         # Assign each pore cluster a unique position within the scaffold
-        self.__assign_cluster_positions(cluster_array_size)
+        self.__assign_positions(cluster_array_size)
 
         # --------------------------------------------------------------------------
         # Initializes and stores cell objects that are in the scaffold
@@ -94,12 +156,65 @@ class Scaffold:
         """Returns the scaffold's stiffness or Young's Modulus (Pa)."""
         return self.__scaffold_stiffness
 
+    def get_time(self):
+        """Returns the total time elapsed in the scaffold"""
+        return self.__time
+
     # --------------------------------------------------------------------------
     # Private Class Methods
     # --------------------------------------------------------------------------
-    def __generate_environment_properties(self, dimension, porosity, pore_diameter, packing_density, cell_diameter,
+    def __generate_pore_scaffold_properties(self, dimension, porosity, pore_diameter, packing_density, cell_diameter):
+        """Calculates scaffold properties related to the number of pores, pore distribution, and pore cell capacity
+
+        :param dimension: side dimension of cubical scaffold (µm).
+        :param porosity: empty or void volume fraction of the scaffold (%).
+        :param pore_diameter: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
+        :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
+        :param cell_diameter: diameter of cells occupying scaffold (µm).
+        :return: distribution of pores for the X, Y, and Z side dimensions, number of pores, maximum cells per
+                 pore cluster, maximum cells in scaffold, pores per cluster.
+        """
+        # --------------------------------------------------------------------------
+        # Calculates volume that is available to pores
+        # --------------------------------------------------------------------------
+        scaffold_volume = dimension**3                          # Scaffold volume, assuming cube (µm^3)
+        scaffold_porous_volume = porosity * scaffold_volume     # Amount of void volume in scaffold (µm^3)
+        pore_volume = 4/3*m.pi*(pore_diameter/2)**3             # Pore volume, assuming spherical (µm^3)
+
+        # --------------------------------------------------------------------------
+        # Calculates the number of pores based on the pore volume available
+        # --------------------------------------------------------------------------
+        pore_number = m.floor(scaffold_porous_volume/pore_volume)   # Calculates number of pores possible in scaffold
+        pores_per_side = m.floor(pore_number ** (1/3))              # Re-calculates an appropriate number of pores
+                                                                    # per side such that the scaffold is cubical
+        pore_number = pores_per_side**3                             # Re-calculates new pore number to maintain
+                                                                    # a cubical scaffold
+
+        # --------------------------------------------------------------------------
+        # Create side-length array
+        # --------------------------------------------------------------------------
+        pore_array = \
+            np.linspace(0, dimension,
+                        num=int(pores_per_side).tolist())       # Creates an array that represents
+                                                                # the positions of clusters along
+                                                                # one side-length of the scaffold.
+
+        # Calculates the maximum cells in the scaffold and maximum cells in a single pore
+        cell_volume = 4/3*np.pi*(cell_diameter/2)**3        # Calculates the volume of a cell in the scaffold
+                                                            # assuming spherical (µm^3)
+        occupied_pore_volume = \
+            packing_density*pore_volume                     # Amount of volume in the pore that can be
+                                                            # occupied by cells based on a packing density (µm^3)
+        pore_cell_max =  \
+            m.floor(occupied_pore_volume / cell_volume)  # Maximum number of cells per pore cluster
+        max_cells = pore_cell_max * pore_number   # Maximum number of cells that can occupy the scaffold
+
+        # Returns scaffold characteristics
+        return pore_array, pore_number, pore_cell_max, pore_number, max_cells
+
+    def __generate_cluster_scaffold_properties(self, dimension, porosity, pore_diameter, packing_density, cell_diameter,
                                           pore_cluster_count):
-        """ Calculates scaffold properties related to the number of pores, pore distribution, and pore cell capacity
+        """Calculates scaffold properties related to the number of pores, pore distribution, and pore cell capacity
 
         :param dimension: side dimension of cubical scaffold (µm).
         :param porosity: empty or void volume fraction of the scaffold (%).
@@ -125,38 +240,50 @@ class Scaffold:
                                                                     # per side such that the scaffold is cubical
         pore_number = pores_per_side**3                             # Re-calculates new pore number to maintain
                                                                     # a cubical scaffold
-        pores_per_cluster = m.floor(pore_number/pore_cluster_count) # Calculate the number of pores contained
+        pores_per_cluster = \
+            m.floor(pore_number/pore_cluster_count)                 # Calculate the number of pores contained
                                                                     # in a single pore cluster
 
         # --------------------------------------------------------------------------
         # Create side-length array
         # --------------------------------------------------------------------------
-        cluster_array = np.linspace(0, dimension, num=int(pore_cluster_count**(1/3))).tolist()   # Creates an array that represents the positions of clusters along one side-length of the scaffold.
+        cluster_array = \
+            np.linspace(0, dimension,
+                        num=int(pore_cluster_count**(1/3))).tolist()    # Creates an array that represents
+                                                                        # the positions of clusters along
+                                                                        # one side-length of the scaffold.
 
         # Calculates the maximum cells in the scaffold and maximum cells in a single pore
-        cell_volume = 4/3*np.pi*(cell_diameter/2)**3                                             # Calulates the volume of cells in the scaffold (assuming spherical) (µm^3)
-        occupiable_cluster_volume = packing_density*pore_volume*pores_per_cluster                # Amount of volume in the pore that can be occupied by cells based on a packing density (µm^3)
-        cluster_cell_max =  m.floor(occupiable_cluster_volume/cell_volume)                       # Maximum number of cells per pore cluster
-        max_cells = cluster_cell_max * pore_cluster_count                                        # Maximum number of cells that can occupy the scaffold
+        cell_volume = 4/3*np.pi*(cell_diameter/2)**3        # Calculates the volume of cells in the scaffold
+                                                            # (assuming spherical) (µm^3)
+        occupied_cluster_volume = \
+            packing_density*pore_volume*pores_per_cluster   # Amount of volume in the pore that can be
+                                                            # occupied by cells based on a packing density (µm^3)
+        cluster_cell_max =  \
+            m.floor(occupied_cluster_volume/cell_volume)  # Maximum number of cells per pore cluster
+        max_cells = cluster_cell_max * pore_cluster_count   # Maximum number of cells that can occupy the scaffold
 
         # Returns scaffold characteristics
         return cluster_array, pore_number, cluster_cell_max, max_cells, pores_per_cluster
 
 
-    def __assign_cluster_positions(self, cluster_array_size):
-        """Assigns each of the pores their corresponding position."""
-        pX = 0
-        pY = 0
-        pZ = 0
-        while pZ < cluster_array_size:
-            while pY < cluster_array_size:
-                while pX < cluster_array_size:
-                    self.scaffold[pX][pY][pZ].position = [pX, pY, pZ]
-                    pX += 1
-                pX = 0
-                pY += 1
-            pY = 0
-            pZ += 1
+    def __assign_positions(self, array_size):
+        """Assigns each of the clusters in the scaffold to their respective locations.
+
+        :param array_size:An array that represents the coordinates of each pore cluster along a scaffold side length
+        """
+        p_x = 0
+        p_y = 0
+        p_z = 0
+        while p_z < array_size:
+            while p_y < array_size:
+                while p_x < array_size:
+                    self.scaffold[p_x][p_y][p_z].position = [p_x, p_y, p_z]
+                    p_x += 1
+                p_x = 0
+                p_y += 1
+            p_y = 0
+            p_z += 1
 
 # --------------------------------------------------------------------------
 # Seeding Methods
@@ -216,9 +343,15 @@ class Scaffold:
 # --------------------------------------------------------------------------
 # Public Methods
 # --------------------------------------------------------------------------
-    def migration_replication(self, data, t, ts, tf, rf, rep_rate):
-        """Performs a migration and replication cycle on all cells in the scaffold at a specified replication rate."""
+    def scaffold_migration_replication(self, data, ts, tf, rf, rep_rate):
+        """Performs a migration and replication cycle on all cells in the scaffold at a specified replication rate.
 
+        :param data: data list to write cell data to
+        :param ts:
+        :param tf:
+        :param rf:
+        :param rep_rate:
+        """
         # Ensure unbiased cellular migration and replication
         r.shuffle(self.cell_objs)
 
