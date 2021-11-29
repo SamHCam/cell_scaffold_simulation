@@ -1,5 +1,5 @@
 import csv
-from scaffold import Scaffold
+import cluster_scaffold
 
 
 # --------------------------------------------------------------------------
@@ -69,7 +69,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
         print("Cell Count: " + scaffold.cell_count)  # TODO: Remove, testing purposes only
 
         # Add time step increment
-        time += time_step  # hours
+        time += ts  # hours
         time = round(time, 1)
 
 
@@ -81,16 +81,16 @@ time_step = 2  # Amount of time the simulation "steps" forward each time to perf
 
 # Scaffold Parameters:
 dimension = 14550                   # Side length of cubical Scaffold (µm)
-porosity = 41.9                     # Measure of void or "empty" volume in scaffold (%)
+porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
 ligand_factor = 100                 # Percent of ligands compared to baseline (%)
 pore_size = 23.9                    # Diameter of pores in the scaffold (µm)
 packing_density = 80                # Fraction of void or empty volume within the scaffold that can be occupied by
                                     # cells (%)
-pore_cluster_count = 8000           # The number of clusters of pores to represent the scaffold, must be cube rootable.
+pore_layer_count = 100              # The number of layers to represent each pore column
 
 # Cell parameters:
-cell_diameter = 5                   # Cell diameter (µm)
+cell_diameter = 35                  # Cell diameter (µm)
 initial_cell_count = 60000          # Initial seeding of scaffold with cells
 replication_probability = 7.72E-06  # Fixed probability that a cell will replicate (s^-1)
 
@@ -102,16 +102,17 @@ recording_frequency = 1             # Frequency of how often the program records
 
 # Header Information
 csv_file_name = "Sim_" + str(scaffold_stiffness) + "MPa_" + str(pore_size) + "PDµm_" + str(
-    cell_diameter) + "CDµm_" + str(replication_probability) + "RP%_" + str(ligand_factor) + "LF%_" + str(
-    porosity) + "PS%" + ".csv"
+    cell_diameter) + "CDµm_" + str(replication_probability) + "RP_" + str(ligand_factor) + "LF%_" + str(
+    porosity) + "PS%_" + str(pore_layer_count) + "CC" + ".csv"
 file_header = [["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "X (µm)", "Y (µm)", "Z (µm)"]]
 
 # --------------------------------------------------------------------------
 # Generate scaffold environment
 # --------------------------------------------------------------------------
 # Generates a scaffold environment based on specified parameters in "Simulation and Scaffold Characteristics"
-environment = Scaffold(dimension, porosity / 100, pore_size, packing_density / 100, cell_diameter,
-                       scaffold_stiffness * 10 ** 6, ligand_factor / 100, pore_cluster_count)
+environment = cluster_scaffold.Cluster_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
+                                                cell_diameter, scaffold_stiffness * 10 ** 6, ligand_factor / 100,
+                                                pore_layer_count)
 
 # --------------------------------------------------------------------------
 # Run Simulation
