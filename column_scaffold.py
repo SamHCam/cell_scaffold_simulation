@@ -2,7 +2,7 @@ import numpy as np
 import math as m
 import random as r
 
-class Cluster_Scaffold:
+class Column_Scaffold:
     def __init__(self, dimension, porosity, pore_diameter, packing_density, cell_diameter, scaffold_stiffness,
                  ligand_factor, pore_column_layers):
         """Seven parameter constructor that defines a scaffold utilizing individual spherical pores.
@@ -12,7 +12,7 @@ class Cluster_Scaffold:
         :param pore_diameter: diameter of pores occupying scaffold (µm).
         :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%)
         :param cell_diameter: diameter of cells occupying scaffold (µm).
-        :param scaffold_stiffness: the Young's modulus of the scaffold.
+        :param scaffold_stiffness: the Young's modulus of the scaffold (Pa).
         :param ligand_factor: percentage of normal ligand percentage in the scaffold.
         :param pore_column_layers: number of layers to represent a single pore column in the scaffold
         """
@@ -59,13 +59,12 @@ class Cluster_Scaffold:
         # Generate the pores in the scaffold and assigns their positions
         # --------------------------------------------------------------------------
         # Number of clusters per scaffold side length
-        cluster_array_size = len(pore_array)
 
         # Generate the scaffold based on the number of clusters
-        self.scaffold = [[[self.Pore([x, y, z], self.__pore_cell_max, pore_diameter, self.__pore_segment_height)
-                           for x in range(cluster_array_size)]
-                          for y in range(cluster_array_size)]
-                         for z in range(pore_column_layers)]
+        self.scaffold = [[[self.Pore_Segment([x, y, z], self.__pore_cell_max, pore_diameter, self.__pore_segment_height)
+                           for z in range(pore_column_layers)]
+                          for y in range(len(pore_array))]
+                         for x in range(len(pore_array))]
 
         # --------------------------------------------------------------------------
         # Initializes and stores cell objects that are in the scaffold
@@ -112,9 +111,10 @@ class Cluster_Scaffold:
         :param pore_diameter: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
         :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
         :param cell_diameter: diameter of cells occupying scaffold (µm).
-        :param pore_column_layers: Number of layers in which to represent segments of the cylindrical clumns
+        :param pore_column_layers: Number of layers in which to represent segments of the cylindrical columns
         :return: distribution of pore columns for the X, Y dimensions, number of pores, maximum cells per
-                 pore, maximum cells in scaffold, distribution of pore segments in the Z direction
+                 pore, maximum cells in scaffold, distribution of pore segments in the Z direction, number of pore
+                 columns, and the height pore pore segments
         """
         # --------------------------------------------------------------------------
         # Calculates volume that is available to pores
@@ -132,8 +132,9 @@ class Cluster_Scaffold:
         pore_columns_per_side = m.floor(pore_column_count ** (1/2))        # Calculates the number of pores per side and
                                                                            # maintains scaffold's cubical nature
 
-        pore_columns = pore_columns_per_side ** 2   # Recalculate new pore-column number to maintain a cubical scaffold
-        pore_segment_count = pore_columns * pore_column_layers     # Calculate number of segments in scaffold
+        pore_columns = pore_columns_per_side ** 2                   # Recalculate new pore-column number to maintain a
+                                                                    # cubical scaffold
+        pore_segment_count = pore_columns * pore_column_layers      # Calculate number of pore segments in scaffold
 
         # --------------------------------------------------------------------------
         # Create arrays to represent positions in the scaffold
@@ -143,20 +144,21 @@ class Cluster_Scaffold:
         column_array = \
             np.linspace(0, dimension, num=int(pore_column_layers)).tolist()
 
+        # Find the height of column segments
         segment_height = column_array[1] - column_array[0]
 
         # --------------------------------------------------------------------------
         # Calculate the volume of pore_column segments
         # --------------------------------------------------------------------------
-        # Calculate the volumes of each pore segment
+        # Calculate pore segment volume and cell volume
         pore_segment_volume = pore_column_volume / pore_column_layers   # Volume of one segment of the pore column
         cell_volume = 4 / 3 * np.pi * (cell_diameter / 2) ** 3  # Calculates the volume of a cell in the scaffold
                                                                 # assuming spherical (µm^3)
 
-        # Calculate the maximum number of cells in one pore segment
+        # Calculate the maximum number of cells in one pore segment based on volumes
         pore_segment_cell_max = m.floor(pore_segment_volume * packing_density / cell_volume)
 
-        # Handles errors in which the segment is too small to hold any cells
+        # Invoke error when the pore segment is too small to hold at least one cell
         if pore_segment_cell_max < 1:
             raise Exception("Current pore segment volume is too small to hold at least one cell.")
 
@@ -167,46 +169,45 @@ class Cluster_Scaffold:
         return pore_array, pore_segment_count, pore_segment_cell_max, max_cells, column_array, pore_columns, \
                segment_height
 
-# --------------------------------------------------------------------------
-# Seeding Methods
-# --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Seeding Methods
+    # --------------------------------------------------------------------------
     def seed_cells_at_top(self, seeded_cell_count, data, seeded_time):
         """Seeds cells at the center of the top layer of the scaffold"""
         # Generate seeded cell objects
-        self.cell_objs = [self.Cell(self.cell_diameter, seeded_time) for i in range(seeded_cell_count)]
+        self.cell_objs = [self.Cell(self.__cell_diameter, seeded_time) for i in range(seeded_cell_count)]
 
         # Find end index and middle index
-        end_point = len(self.cluster_array) - 1
+        end_point = len(self.__pore_array) - 1
         middle_point = end_point/2
 
         # Seed each cell object
         for cell in self.cell_objs:
             # Assign a unique ID for each seeded cell
-            cell.ID = self.cell_ID_counter
-            self.cell_ID_counter += 1
-            self.cell_count += 1
+            cell.ID = self.__cell_ID_counter
+            self.__cell_ID_counter += 1
+            self.__cell_count += 1
 
             # Random seed cells by generating random positions, writes its properties to the data list
             while True:
-                new_position = [r.randint(int(middle_point - end_point/2), int(middle_point + end_point/2)),
-                                r.randint(int(middle_point - end_point/2), int(middle_point + end_point/2)),
-                                r.randint(int(end_point - 2), int(end_point))]
+                new_position = [r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
+                                r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
+                                len(self.__column_array) - 2]
+
                 pore_destination = self.scaffold[new_position[0]][new_position[1]][new_position[2]]
                 if (not pore_destination.is_full()):
                     cell.x = new_position[0]
                     cell.y = new_position[1]
                     cell.z = new_position[2]
                     pore_destination.cell_number += 1
-
                     break
 
-
-
-# --------------------------------------------------------------------------
-# Public Methods
-# --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Public Methods
+    # --------------------------------------------------------------------------
     def migration_replication(self, data, ts, tf, rf, rep_rate):
         """Performs a migration and replication cycle on all cells in the scaffold at a specified replication rate.
+
         :param data: Stores data in rows in an expandable list
         :param ts: specifies the simulation's time-step (hour)
         :param tf:
@@ -224,7 +225,7 @@ class Cluster_Scaffold:
         for cell in self.cell_objs:
 
             # Get current status of neighboring pore capacity
-            n_cap = self.__neighbor_conditional_check(cell)[:]
+            n_cap = self.__neighbor_conditional_check(cell)
 
             # If all pores, including the pore the cell is in, are full then no movement and no replication occurs
             if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5] and n_cap[6]:
@@ -236,13 +237,14 @@ class Cluster_Scaffold:
                 # Only the pore the cell is currently in is not full
                 if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5]:
                     # Generate a random replicate rate number based on specified replication rate
-                    rp = self.generate_replication_rate_number(rep_rate)
+                    rp = self.__generate_replication_rate_number(rep_rate)
 
                     # Replicate only if replication number matches
                     if rp != 1:
                         # Writes cell properties to data list
                         if t % rf == 0 or t == tf:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+
                     # Replication of cell occurs if replication condition is achieved
                     else:
                         # Create a new daughter cell
@@ -266,7 +268,7 @@ class Cluster_Scaffold:
                     self.__perform_migration(cell, n_cap, ts, False)
 
                     # Generate a random replicate rate number based on specified replication rate
-                    rp = self.generate_replication_rate_number(rep_rate)
+                    rp = self.__generate_replication_rate_number(rep_rate)
 
                     # Replicate only if replication number matches
                     if rp != 1:
@@ -276,8 +278,8 @@ class Cluster_Scaffold:
                     else:
                         # Generate a new daughter cell and perform migration on it
                         new_daughter_cell = self.__new_daughter_cell(cell, t)
-                        daughter_neighbor_conditions = self.__neighbor_conditional_check(new_daughter_cell)
-                        self.__perform_migration(new_daughter_cell, daughter_neighbor_conditions, ts, True)
+                        daughter_n_cap = self.__neighbor_conditional_check(new_daughter_cell)
+                        self.__perform_migration(new_daughter_cell, daughter_n_cap, ts, True)
 
                         # Replicated cell must migrate to exist
                         if new_daughter_cell.moves_made != 0:
@@ -288,15 +290,18 @@ class Cluster_Scaffold:
 
                         # Writes cell properties to data list
                         if t % rf == 0 or t == tf:
-                            data.append(cell.write_data(self.__cluster_array, t))
+                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                             # Write daughter cell properties to data list only if it exists
                             if new_daughter_cell.moves_made != 0:
-                                data.append(new_daughter_cell.write_data(self.__cluster_array, t))
+                                data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
+
+        # Update scaffold time
+        self.__time += ts
 
     def increment_cell_tracking(self):
         """Update cell count and cell ID counter"""
-        self.cell_ID_counter += 1
-        self.cell_count += 1
+        self.__cell_ID_counter += 1
+        self.__cell_count += 1
 
     @staticmethod
     def __generate_replication_rate_number(rep_rate):
@@ -326,7 +331,9 @@ class Cluster_Scaffold:
         # Ensure direction is not full or out of bounds
         while True:
             migration_direction = r.randint(1, 6)
-            if cell.z < 0:
+
+            # Can migrate in the ±X, Y, and Z directions at bottom of scaffold
+            if cell.z == 0:
                 if (neighbor_capacity[0]) and (migration_direction == 1):
                     continue
                 elif (neighbor_capacity[1]) and (migration_direction == 2):
@@ -335,6 +342,13 @@ class Cluster_Scaffold:
                     continue
                 elif (neighbor_capacity[3]) and (migration_direction == 4):
                     continue
+                elif (neighbor_capacity[4]) and (migration_direction == 5):
+                    continue
+                elif (neighbor_capacity[5]) and (migration_direction == 6):
+                    continue
+                else:
+                    break;
+            # Can only migrate in the ±Z direction if not at bottom of scaffold
             else:
                 if (neighbor_capacity[4]) and (migration_direction == 5):
                     continue
@@ -347,12 +361,18 @@ class Cluster_Scaffold:
         # Calculate probability to migrate in chosen direction
         # --------------------------------------------------------------------------
         # Calculate distance
-        cell_velocity = self.__calculate_cell_velocity(cell, migration_direction)       # Cell velocity in chosen direction (µm/s)
-        distance_between_clusters = self.__pore_array[1] - self.__pore_array[0]                 # Distance between neighboring pores (µm, equidistant)
-        cell_distance_traveled = cell_velocity * ts * 3600                                      # Distance cell can travel (µm)
+        cell_velocity = \
+            self.__calculate_cell_velocity(cell, migration_direction)  # Cell velocity in chosen direction (µm/s)
+        distance_between_segments = \
+            self.__column_array[1] - self.__column_array[0]            # Distance between neighboring pore segments (µm)
+        cell_distance_traveled = cell_velocity * ts * 3600             # Distance cell can travel (µm)
 
         # Calculate probability to migrate as a ratio between distance cell can travel and distance between pores
-        probability_of_migration = cell_distance_traveled/distance_between_clusters * 100       # Probability of migration (%)
+        probability_of_migration = cell_distance_traveled/distance_between_segments * 100   # (%)
+
+        # Warn if probability of migration exceeds 100%
+        if (probability_of_migration) > 100:
+            print("Warning: migration rate too high, consider turning time step down")
 
         # --------------------------------------------------------------------------
         # Cell Migration
@@ -368,76 +388,83 @@ class Cluster_Scaffold:
             if migration_direction == 1:
                 # X > 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[0] += 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.x += 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
             elif migration_direction == 2:
                 # X < 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[0] -= 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.x -= 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
             elif migration_direction == 3:
                 # Y > 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[1] += 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.y += 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
             elif migration_direction == 4:
                 # Y < 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[1] -= 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.y -= 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
             elif migration_direction == 5:
                 # Z > 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[2] += 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.z += 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
             elif migration_direction == 6:
                 # Z < 0
                 if not is_new_daughter_cell:
-                    self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number -= 1
-                cell.position[2] -= 1
-                self.scaffold[cell.position[0]][cell.position[1]][cell.position[2]].cell_number += 1
-
+                    self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
+                cell.z -= 1
+                self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
 
     def __calculate_cell_velocity(self, cell, migration_direction):
-        """Calculates the cell velocity (speed) towards one of six non-full neighboring pores. Returns the cell velocity."""
+        """
+        Calculates the cell velocity (speed) towards one of six non-full neighboring pores
+
+        :param cell: Cell to calculate speed of
+        :param migration_direction: Direction of migration
+        :return: Cell speed (µm/s)
+        """
         # --------------------------------------------------------------------------
         # Calculate number of ligands
         # --------------------------------------------------------------------------
         # Calculate ligand number based on the pore the cell plans to migrate to
-        x_increment = 0
-        y_increment = 0
-        z_increment = 0
+        x_inc = 0
+        y_inc = 0
+        z_inc = 0
 
         if migration_direction == 1:
-            x_increment += 1
+            x_inc += 1
         elif migration_direction == 2:
-            x_increment -= 1
+            x_inc -= 1
         elif migration_direction == 3:
-            y_increment += 1
+            y_inc += 1
         elif migration_direction == 4:
-            y_increment -= 1
+            y_inc -= 1
         elif migration_direction == 5:
-            z_increment += 1
+            z_inc += 1
         elif migration_direction == 6:
-            z_increment -= 1
-
+            z_inc -= 1
 
         # Calculate available surface area in a given pore based on the current capacity of the pore
         available_area = 0
         next_pore = \
-            self.scaffold[cell.position[0] + x_increment][cell.position[1] + y_increment][cell.position[2] + z_increment]
+            self.scaffold[cell.x + x_inc][cell.y + y_inc][cell.z + z_inc]
         if next_pore.surface_area < 1E3 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter):
             available_area = next_pore.surface_area/(1E3 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter))
         else:
             available_area = 1
 
         # Calculate ligand max and ligand number
-        ligand_num = available_area*(np.pi*(self.cell_diameter/2)**2 - np.pi*(self.cell_diameter/2 - 8) ** 2) * 500
+        ligand_num = 500 * available_area * (np.pi * (self.__cell_diameter/2) ** 2
+                                             - np.pi * (self.__cell_diameter/2 - 8) ** 2)
 
         # --------------------------------------------------------------------------
         # Calculate Force Balance
@@ -468,13 +495,12 @@ class Cluster_Scaffold:
         else:
             traction_hydrostatic = f_traction
 
-        v = c*eta/traction_hydrostatic # Cell velocity to planned pore to migrate to (µm/s)
+        v = c*eta/traction_hydrostatic      # Cell velocity to planned pore to migrate to (µm/s)
 
         # Negative velocity indicates hydrostatic force dominates, return 0
         if v < 0:
             return 0
-        return v
-
+        return r.randint(1, 100) * 1E-3
 
     def __neighbor_conditional_check(self, cell_to_check):
         """Checks whether the cell's current pore's neighboring cells are full
@@ -486,7 +512,7 @@ class Cluster_Scaffold:
         neighbor_conditions = [False, False, False, False, False, False, False]
 
         # Evaluate neighbor cell conditions as well as boundary conditions
-        x_y_bounds = len(self.cluster_array) - 1
+        x_y_bounds = len(self.__pore_array) - 1
         z_bounds = self.__pore_column_layers - 1
 
         # Check +X direction
@@ -540,7 +566,9 @@ class Cluster_Scaffold:
         """
 
         daughter_cell = self.Cell(parent_cell.cell_diameter, time_in)
-        daughter_cell.position = parent_cell.position[:]
+        daughter_cell.x = parent_cell.x
+        daughter_cell.y = parent_cell.y
+        daughter_cell.z = parent_cell.z
         daughter_cell.ID = self.__cell_ID_counter
         daughter_cell.generation = parent_cell.generation + 1
 
@@ -593,7 +621,6 @@ class Cluster_Scaffold:
             self.moves_made = 0                     # Total number of moves made within scaffold
             self.time_in = time_in                  # Time in which cell entered the scaffold (hours)
             self.cell_diameter = cell_diameter      # Diameter of cell (µm)
-            self.f_trac = 0
 
         def write_data(self, pore_array, column_array, current_time):
             """ Generates a data array detailing the current properties of the cell
@@ -604,7 +631,7 @@ class Cluster_Scaffold:
             :return: Returns a data list detailing various properties of the cell including the current simulation time,
             its unique cell ID, the number of moves it has made, and its X, Y, and Z position in the scaffold.
             """
-            return [current_time, self.ID, self.generation, self.moves_made, self.f_trac,
+            return [current_time, self.ID, self.generation, self.moves_made,
                     round(pore_array[self.x], 3),
                     round(pore_array[self.y], 3),
                     round(column_array[self.z], 3)]

@@ -1,5 +1,5 @@
 import csv
-import cluster_scaffold
+import column_scaffold
 
 
 # --------------------------------------------------------------------------
@@ -56,7 +56,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
         print(time)  # TODO: Remove, testing purposes only
 
         # Migration and replication of all cells in the designated scaffold
-        scaffold.migration_replication(data, time, time_step, time_final, rf,
+        scaffold.migration_replication(data, time_step, time_final, rf,
                                        rp * 3600 * time_step)
 
         # Write data to the data list at specified intervals
@@ -66,7 +66,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
             # Clear out data list after recording
             data = []
 
-        print("Cell Count: " + scaffold.cell_count)  # TODO: Remove, testing purposes only
+        print("Cell Count: " + str(scaffold.get_cell_count()))  # TODO: Remove, testing purposes only
 
         # Add time step increment
         time += ts  # hours
@@ -77,17 +77,17 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 # Simulation and Scaffold Characteristics
 # --------------------------------------------------------------------------
 # Simulation Parameters
-time_step = 2  # Amount of time the simulation "steps" forward each time to perform migration and/or replication (hour)
+time_step = 0.001  # Amount of time the simulation "steps" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
-dimension = 14550                   # Side length of cubical Scaffold (µm)
+dimension = 14550                  # Side length of cubical Scaffold (µm)
 porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
 ligand_factor = 100                 # Percent of ligands compared to baseline (%)
 pore_size = 23.9                    # Diameter of pores in the scaffold (µm)
 packing_density = 80                # Fraction of void or empty volume within the scaffold that can be occupied by
                                     # cells (%)
-pore_layer_count = 100              # The number of layers to represent each pore column
+pore_layer_count = 10              # The number of layers to represent each pore column
 
 # Cell parameters:
 cell_diameter = 35                  # Cell diameter (µm)
@@ -95,7 +95,7 @@ initial_cell_count = 60000          # Initial seeding of scaffold with cells
 replication_probability = 7.72E-06  # Fixed probability that a cell will replicate (s^-1)
 
 # Simulation Parameters:
-simulation_time = 72                # Time length of simulation (hour)
+simulation_time = 140                # Time length of simulation (hour)
 writing_frequency = 1               # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
 recording_frequency = 1             # Frequency of how often the program records data (hours/record to data list)
@@ -110,7 +110,7 @@ file_header = [["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Mov
 # Generate scaffold environment
 # --------------------------------------------------------------------------
 # Generates a scaffold environment based on specified parameters in "Simulation and Scaffold Characteristics"
-environment = cluster_scaffold.Cluster_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
+environment = column_scaffold.Column_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
                                                 cell_diameter, scaffold_stiffness * 10 ** 6, ligand_factor / 100,
                                                 pore_layer_count)
 
