@@ -173,10 +173,14 @@ class Column_Scaffold:
     # --------------------------------------------------------------------------
     # Seeding Methods
     # --------------------------------------------------------------------------
-    def seed_cells_at_top(self, seeded_cell_count, data, seeded_time):
-        """Seeds cells at the center of the top layer of the scaffold"""
+    def seed_cells_at_top(self, seeded_cell_count, data):
+        """Seeds cells at the center of the top layer of the scaffold
+
+        :param seeded_cell_count: Number of cells to seed into scaffold
+        :param data: Data list to write new cell data to
+        """
         # Generate seeded cell objects
-        self.cell_objs = [self.Cell(self.__cell_diameter, seeded_time) for i in range(seeded_cell_count)]
+        self.cell_objs = [self.Cell(self.__cell_diameter, self.__time) for i in range(seeded_cell_count)]
 
         # Find end index and middle index
         end_point = len(self.__pore_array) - 1
@@ -191,17 +195,22 @@ class Column_Scaffold:
 
             # Random seed cells by generating random positions, writes its properties to the data list
             while True:
+                # Generate random position at the top of the scaffold
                 new_position = [r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
                                 r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
                                 len(self.__column_array) - 2]
 
+                # Check if random position is full
                 pore_destination = self.scaffold[new_position[0]][new_position[1]][new_position[2]]
-                if (not pore_destination.is_full()):
+                if not pore_destination.is_full():
                     cell.x = new_position[0]
                     cell.y = new_position[1]
                     cell.z = new_position[2]
                     pore_destination.cell_number += 1
                     break
+
+            # Write data to list
+            cell.write_data(self.__pore_array, self.__column_array, self.__time)
 
     # --------------------------------------------------------------------------
     # Public Methods
@@ -211,13 +220,13 @@ class Column_Scaffold:
 
         :param data: Stores data in rows in an expandable list
         :param ts: specifies the simulation's time-step (hour)
-        :param tf:
-        :param rf:
-        :param rep_rate:
+        :param tf: Time in which the simulation ends (hour)
+        :param rf: Recording frequency
+        :param rep_rate: Cell replication rate (s^-1)
         """
 
         # Get current time elapsed
-        t = self.__time
+        t = round(self.__time, 2)
 
         # Ensure unbiased cellular migration and replication
         r.shuffle(self.cell_objs)
@@ -334,7 +343,7 @@ class Column_Scaffold:
             migration_direction = r.randint(1, 6)
 
             # Can migrate in the ±X, Y, and Z directions at bottom of scaffold
-            if cell.z == 0:
+            if self.__can_migrate_horizontally(cell):
                 if (neighbor_capacity[0]) and (migration_direction == 1):
                     continue
                 elif (neighbor_capacity[1]) and (migration_direction == 2):
@@ -366,14 +375,20 @@ class Column_Scaffold:
             self.__calculate_cell_velocity(cell, migration_direction)  # Cell velocity in chosen direction (µm/s)
         distance_between_segments = \
             self.__column_array[1] - self.__column_array[0]            # Distance between neighboring pore segments (µm)
+        distance_between_columns = \
+            self.__pore_array[1] - self.__pore_array[0]                # Distance between neighboring columns (µm)
         cell_distance_traveled = cell_velocity * ts * 3600             # Distance cell can travel (µm)
 
         # Calculate probability to migrate as a ratio between distance cell can travel and distance between pores
-        probability_of_migration = cell_distance_traveled/distance_between_segments * 100   # (%)
+        probability_of_migration = 0
+        if migration_direction == 5 or migration_direction == 6:
+            probability_of_migration = cell_distance_traveled/distance_between_segments * 100   # (%)
+        else:
+            probability_of_migration = cell_distance_traveled/distance_between_columns * 100
 
         # Warn if probability of migration exceeds 100%
-        if (probability_of_migration) > 100:
-            print("Warning: migration rate too high, consider turning time step down")
+        # if probability_of_migration > 100:
+            # print("Warning: migration rate too high, consider turning time step down")
 
         # --------------------------------------------------------------------------
         # Cell Migration
@@ -458,8 +473,8 @@ class Column_Scaffold:
         available_area = 0
         next_pore = \
             self.scaffold[cell.x + x_inc][cell.y + y_inc][cell.z + z_inc]
-        if next_pore.surface_area < 1E3 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter):
-            available_area = next_pore.surface_area/(1E3 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter))
+        if next_pore.surface_area < 1E6 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter):
+            available_area = next_pore.surface_area/(1E6 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter))
         else:
             available_area = 1
 
@@ -471,17 +486,17 @@ class Column_Scaffold:
         # Calculate Force Balance
         # --------------------------------------------------------------------------
         # Force of Traction Calculation (front)
-        c2 = 1E-12      # Saturation force assumed to be 1 pN for scaffold stiffness > 1 MPA
+        c2 = 1      # Saturation force assumed to be 1 pN for scaffold stiffness > 1 MPA
 
         f_traction = c2 * ligand_num
 
         # Force Hydrostatic
         rho = 997   # Density of medium (kg/m^3)
         g = 9.8     # Acceleration of gravity (m/s^2)
-        hCell = self.__column_array[cell.z] * self.__pore_segment_height # Z-position of cell (µm)
-        hScaffold = self.__dimension                                       # Height of scaffold (µm)
+        h_cell = self.__column_array[cell.z]                                # Z-position of cell (µm)
+        h_scaffold = self.__dimension                                       # Height of scaffold (µm)
 
-        f_hydrostatic = rho * g * (hScaffold - hCell) * 1E-6 * next_pore.surface_area        # Hydrostatic Force (pN)
+        f_hydrostatic = rho * g * (h_scaffold - h_cell) * 1E-6 * next_pore.surface_area        # Hydrostatic Force (pN)
 
         # Force of Drag Calculation
         c = 6 * np.pi * self.__cell_diameter/2      # Constant c depends on the shape of a cell for a spherical cell
@@ -497,22 +512,24 @@ class Column_Scaffold:
         else:
             traction_hydrostatic = f_traction
 
-        v = c*eta/traction_hydrostatic      # Cell velocity to planned pore to migrate to (µm/s)
+        v = 1E-6 * c*eta/(traction_hydrostatic)      # Cell velocity to planned pore to migrate to (µm/s)
 
         # Negative velocity indicates hydrostatic force dominates, return 0
         if v < 0:
             return 0
         return v
 
-    def __calculate_z_bound(self, cell):
-        z_percentage = 0.2
+    def __can_migrate_horizontally(self, cell):
+        # Define z-bound from the bottom of the scaffold in which the cells can perform
+        # lateral migration
+        z_percentage = 20       # %
+        z_bound = self.__dimension * z_percentage/100
 
-        z_bound = self.__dimension * 0.2
+        # Find cell's current position
         cell_z_position = self.__column_array[cell.z]
-        if cell_z_positon <= z_bound:
+        if cell_z_position <= z_bound:
             return True
         return False
-
 
     def __neighbor_conditional_check(self, cell_to_check):
         """Checks whether the cell's current pore's neighboring cells are full
@@ -528,25 +545,25 @@ class Column_Scaffold:
         z_bounds = self.__pore_column_layers - 1
 
         # Check +X direction
-        if (cell_to_check.x + 1) > x_y_bounds or self.__calculate_z_bound(cell_to_check):
+        if (cell_to_check.x + 1) > x_y_bounds or self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[0] = True
         else:
             neighbor_conditions[0] = self.scaffold[cell_to_check.x + 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check -X direction
-        if (cell_to_check.x - 1) < 0 or self.__calculate_z_bound(cell_to_check):
+        if (cell_to_check.x - 1) < 0 and self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[1] = True
         else:
             neighbor_conditions[1] = self.scaffold[cell_to_check.x - 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check +Y direction
-        if (cell_to_check.y + 1) > x_y_bounds or __calculate_z_bound(cell_to_check):
+        if (cell_to_check.y + 1) > x_y_bounds and self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[2] = True
         else:
             neighbor_conditions[2] = self.scaffold[cell_to_check.x][cell_to_check.y + 1][cell_to_check.z].is_full()
 
         # Check -Y direction
-        if (cell_to_check.y - 1) < 0 or __calculate_z_bound(cell_to_check):
+        if (cell_to_check.y - 1) < 0 and self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[3] = True
         else:
             neighbor_conditions[3] = self.scaffold[cell_to_check.x][cell_to_check.y - 1][cell_to_check.z].is_full()
@@ -586,7 +603,6 @@ class Column_Scaffold:
 
         return daughter_cell
 
-
     class Pore_Segment:
         def __init__(self, position, max_cells, pore_diameter, segment_height):
             """Four parameter constructor for a pore object
@@ -614,7 +630,6 @@ class Column_Scaffold:
         def calculate_cell_adhesion_area(self, cell_diameter):
             """Calculates the current area of the pore taken up by cells"""
             return self.cell_number * np.pi * (cell_diameter/2) ** 2
-
 
     class Cell:
         def __init__(self, cell_diameter, time_in):

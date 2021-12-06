@@ -36,7 +36,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     :param time_final: specifies the simulation's end time (hour)
     :param wf: Frequency of how often the program writes all stored data to the CSV (hours/write to file)
     :param rf: Frequency of how often the program records data (hours/record to data list)
-    :param rp: # Fixed probability that a cell will replicate (s^-1)
+    :param rp: Fixed probability that a cell will replicate (s^-1)
     """
 
     # Stores data in rows in an expandable list
@@ -46,7 +46,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     write_data(header, file_name)
 
     # Generate and seed cells at a specified location within the scaffold
-    scaffold.seed_cells_at_top(seeded_cell_count, data, 0)
+    scaffold.seed_cells_at_top(seeded_cell_count, data)
 
     # Simulation starts after the first time step
     time = time_step
@@ -70,24 +70,24 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 
         # Add time step increment
         time += ts  # hours
-        time = round(time, 1)
+        time = round(time, 2)
 
 
 # --------------------------------------------------------------------------
 # Simulation and Scaffold Characteristics
 # --------------------------------------------------------------------------
 # Simulation Parameters
-time_step = 0.5  # Amount of time the simulation "steps" forward each time to perform migration and/or replication (hour)
+time_step = 0.01  # Time "Step" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
-dimension = 14550                  # Side length of cubical Scaffold (µm)
+dimension = 14550                   # Side length of cubical Scaffold (µm)
 porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
-ligand_factor = 100                 # Percent of ligands compared to baseline (%)
+ligand_factor = 100                 # Percentage of ligands compared to normal (%)
 pore_size = 23.9                    # Diameter of pores in the scaffold (µm)
 packing_density = 80                # Fraction of void or empty volume within the scaffold that can be occupied by
                                     # cells (%)
-pore_layer_count = 10              # The number of layers to represent each pore column
+pore_layer_count = 100              # The number of layers to represent each pore column
 
 # Cell parameters:
 cell_diameter = 35                  # Cell diameter (µm)
@@ -95,7 +95,7 @@ initial_cell_count = 60000          # Initial seeding of scaffold with cells
 replication_probability = 7.72E-06  # Fixed probability that a cell will replicate (s^-1)
 
 # Simulation Parameters:
-simulation_time = 140                # Time length of simulation (hour)
+simulation_time = 140               # Total simulation time (hour)
 writing_frequency = 1               # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
 recording_frequency = 1             # Frequency of how often the program records data (hours/record to data list)
@@ -109,13 +109,13 @@ file_header = [["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Mov
 # --------------------------------------------------------------------------
 # Generate scaffold environment
 # --------------------------------------------------------------------------
-# Generates a scaffold environment based on specified parameters in "Simulation and Scaffold Characteristics"
-environment = column_scaffold.Column_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
+# Generates a scaffold based on specified parameters in "Simulation and Scaffold Characteristics"
+scaffold_1 = column_scaffold.Column_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
                                                 cell_diameter, scaffold_stiffness * 10 ** 6, ligand_factor / 100,
                                                 pore_layer_count)
 
 # --------------------------------------------------------------------------
 # Run Simulation
 # --------------------------------------------------------------------------
-simulation(file_header, csv_file_name, environment, initial_cell_count, time_step, simulation_time, writing_frequency,
+simulation(file_header, csv_file_name, scaffold_1, initial_cell_count, time_step, simulation_time, writing_frequency,
            recording_frequency, replication_probability)
