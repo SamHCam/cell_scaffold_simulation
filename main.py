@@ -77,7 +77,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 # Simulation and Scaffold Characteristics
 # --------------------------------------------------------------------------
 # Simulation Parameters
-time_step = 0.001  # Amount of time the simulation "steps" forward each time to perform migration and/or replication (hour)
+time_step = 0.5  # Amount of time the simulation "steps" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
 dimension = 14550                  # Side length of cubical Scaffold (µm)

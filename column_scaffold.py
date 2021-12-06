@@ -38,6 +38,7 @@ class Column_Scaffold:
         self.__pore_segment_height = seg_height             # Height of pore column segment
 
         # Scaffold properties
+        self.__dimension = dimension                        # Side length of cubical scaffold (µm)
         self.__pore_diameter = pore_diameter                # The diameters of pores in the scaffold (µm)
         self.__cell_diameter = cell_diameter                # The cell diameter of cells that can be seeded in
                                                             # scaffold (µm)
@@ -315,7 +316,7 @@ class Column_Scaffold:
         if rep_rate != 0:
             # Migration rate is capped
             if round(1 / rep_rate) == 1:
-                print("Warning: replication rate is capped, consider increasing your time step.")
+                # print("Warning: replication rate is capped, consider increasing your time step.")
                 rp = 1
             else:
                 # Generate a random replication number
@@ -462,9 +463,9 @@ class Column_Scaffold:
         else:
             available_area = 1
 
-        # Calculate ligand max and ligand number
-        ligand_num = 500 * available_area * (np.pi * (self.__cell_diameter/2) ** 2
-                                             - np.pi * (self.__cell_diameter/2 - 8) ** 2)
+        # Calculate ligand number
+        ligand_num = 100 * available_area * (np.pi * (self.__cell_diameter/2) ** 2
+                                             - np.pi * (self.__cell_diameter/2 - 4) ** 2)
 
         # --------------------------------------------------------------------------
         # Calculate Force Balance
@@ -477,9 +478,10 @@ class Column_Scaffold:
         # Force Hydrostatic
         rho = 997   # Density of medium (kg/m^3)
         g = 9.8     # Acceleration of gravity (m/s^2)
-        h = self.__column_array[cell.z] * 10E-6 # height (m)
+        hCell = self.__column_array[cell.z] * self.__pore_segment_height # Z-position of cell (µm)
+        hScaffold = self.__dimension                                       # Height of scaffold (µm)
 
-        f_hydrostatic = rho*g*h
+        f_hydrostatic = rho * g * (hScaffold - hCell) * 1E-6 * next_pore.surface_area        # Hydrostatic Force (pN)
 
         # Force of Drag Calculation
         c = 6 * np.pi * self.__cell_diameter/2      # Constant c depends on the shape of a cell for a spherical cell
@@ -500,7 +502,17 @@ class Column_Scaffold:
         # Negative velocity indicates hydrostatic force dominates, return 0
         if v < 0:
             return 0
-        return r.randint(1, 100) * 1E-3
+        return v
+
+    def __calculate_z_bound(self, cell):
+        z_percentage = 0.2
+
+        z_bound = self.__dimension * 0.2
+        cell_z_position = self.__column_array[cell.z]
+        if cell_z_positon <= z_bound:
+            return True
+        return False
+
 
     def __neighbor_conditional_check(self, cell_to_check):
         """Checks whether the cell's current pore's neighboring cells are full
@@ -516,25 +528,25 @@ class Column_Scaffold:
         z_bounds = self.__pore_column_layers - 1
 
         # Check +X direction
-        if (cell_to_check.x + 1) > x_y_bounds or cell_to_check.z != 0:
+        if (cell_to_check.x + 1) > x_y_bounds or self.__calculate_z_bound(cell_to_check):
             neighbor_conditions[0] = True
         else:
             neighbor_conditions[0] = self.scaffold[cell_to_check.x + 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check -X direction
-        if (cell_to_check.x - 1) < 0 or cell_to_check.x != 0:
+        if (cell_to_check.x - 1) < 0 or self.__calculate_z_bound(cell_to_check):
             neighbor_conditions[1] = True
         else:
             neighbor_conditions[1] = self.scaffold[cell_to_check.x - 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check +Y direction
-        if (cell_to_check.y + 1) > x_y_bounds or cell_to_check.z != 0:
+        if (cell_to_check.y + 1) > x_y_bounds or __calculate_z_bound(cell_to_check):
             neighbor_conditions[2] = True
         else:
             neighbor_conditions[2] = self.scaffold[cell_to_check.x][cell_to_check.y + 1][cell_to_check.z].is_full()
 
         # Check -Y direction
-        if (cell_to_check.y - 1) < 0 or cell_to_check.z != 0:
+        if (cell_to_check.y - 1) < 0 or __calculate_z_bound(cell_to_check):
             neighbor_conditions[3] = True
         else:
             neighbor_conditions[3] = self.scaffold[cell_to_check.x][cell_to_check.y - 1][cell_to_check.z].is_full()
@@ -590,9 +602,9 @@ class Column_Scaffold:
             self.z = position[2]                                        # Z-position of pore within scaffold
             self.cell_number = 0                                        # Number of cells currently occupying pore
             self.max_cells = max_cells                                  # Max number of cells that can occupy the pore
+            self.cs_area = 2 * np.pi * pore_diameter/2                  # Cross-sectional area of the pore segment (µm)
             self.surface_area = \
-                2 * np.pi * pore_diameter/2 * segment_height \
-                + 2 * np.pi * pore_diameter/2 ** 2                       # Calculates the surface area of the pore
+                np.pi * pore_diameter/2 * segment_height                 # Calculates the surface area of the pore
                                                                          # segment (assuming cylindrical)
 
         def is_full(self):
