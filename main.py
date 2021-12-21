@@ -11,12 +11,11 @@ def write_data(data_list, file_name):
     :param data_list: data list to write to CSV file
     :param file_name: filename to write to
     """
-
-    with open(file_name, 'a', newline='') as csvFile:
+    with open(file_name, 'a', newline='') as csv_file:
         for i in range(len(data_list)):
-            writer = csv.writer(csvFile)
+            writer = csv.writer(csv_file)
             writer.writerow(data_list[i])
-    csvFile.close()
+    csv_file.close()
 
 
 # --------------------------------------------------------------------------
@@ -37,7 +36,6 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     :param rf: Frequency of how often the program records data (hours/record to data list)
     :param rp: Fixed probability that a cell will replicate (s^-1)
     """
-
     # Stores data in rows in an expandable list
     data = []
 
@@ -47,12 +45,12 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     # Generate and seed cells at a specified location within the scaffold
     scaffold.seed_cells_at_top(seeded_cell_count, data)
 
-    # Simulation starts after the first time step
-    time = time_step
+    # Time starts at time step after seeding
+    time = ts
 
     # Initiation of time step simulation until specified simulation end-time
     while time <= time_final:
-        print(time)  # TODO: Remove, testing purposes only
+        print("Simulation Time: ", time)  # TODO: Remove, testing purposes only
 
         # Migration and replication of all cells in the designated scaffold
         scaffold.migration_replication(data, time_step, time_final, rf,
@@ -76,7 +74,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 # Simulation and Scaffold Characteristics
 # --------------------------------------------------------------------------
 # Simulation Parameters
-time_step = 0.01  # Time "Step" forward each time to perform migration and/or replication (hour)
+time_step = 0.1  # Time "Step" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
 dimension = 14550                   # Side length of cubical Scaffold (µm)

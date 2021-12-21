@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import math as m
 import random as r
@@ -99,6 +101,10 @@ class Column_Scaffold:
         """Returns the scaffold's stiffness or Young's Modulus (Pa)."""
         return self.__scaffold_stiffness
 
+    def get_time(self):
+        """Returns the scaffold's current time"""
+        return self.__time
+
     # --------------------------------------------------------------------------
     # Private Class Methods
     # --------------------------------------------------------------------------
@@ -184,21 +190,33 @@ class Column_Scaffold:
 
         # Find end index and middle index
         end_point = len(self.__pore_array) - 1
-        middle_point = end_point/2
+        center_point = end_point/2
 
+        # Determine a seeding radius
+        radius = int((end_point - center_point)/2)
+
+        count = 0
         # Seed each cell object
         for cell in self.cell_objs:
+            count += 1
+            print(count)
+
             # Assign a unique ID for each seeded cell
             cell.ID = self.__cell_ID_counter
             self.__cell_ID_counter += 1
             self.__cell_count += 1
 
+
             # Random seed cells by generating random positions, writes its properties to the data list
             while True:
+                # Generate a random radius and angle
+                rand_radius = radius * math.sqrt(r.randint(0, 100)/100)
+                rand_theta = r.randint(0, 100)/100 * 2 * math.pi
+
                 # Generate random position at the top of the scaffold
-                new_position = [r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
-                                r.randint(int(middle_point - end_point/4), int(middle_point + end_point/4)),
-                                len(self.__column_array) - 2]
+                new_position = [int(center_point + rand_radius * math.cos(rand_theta)),
+                                int(center_point + rand_radius * math.sin(rand_theta)),
+                                r.randint(len(self.__column_array) - 6, len(self.__column_array) - 1)]
 
                 # Check if random position is full
                 pore_destination = self.scaffold[new_position[0]][new_position[1]][new_position[2]]
@@ -210,7 +228,7 @@ class Column_Scaffold:
                     break
 
             # Write data to list
-            cell.write_data(self.__pore_array, self.__column_array, self.__time)
+            data.append(cell.write_data(self.__pore_array, self.__column_array, self.__time))
 
     # --------------------------------------------------------------------------
     # Public Methods
@@ -224,6 +242,8 @@ class Column_Scaffold:
         :param rf: Recording frequency
         :param rep_rate: Cell replication rate (s^-1)
         """
+        # Update scaffold time
+        self.__time += ts
 
         # Get current time elapsed
         t = round(self.__time, 2)
@@ -258,14 +278,11 @@ class Column_Scaffold:
                     # Replication of cell occurs if replication condition is achieved
                     else:
                         # Create a new daughter cell
-                        new_daughter_cell = self.__new_daughter_cell(cell, t)
+                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
 
                         # New cell with an identical pore location to its parent is added to the list of cell objects
                         self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
-                        self.cell_objs.append(new_daughter_cell)
-
-                        # Increment cell ID and cell count
-                        self.increment_cell_tracking()
+                        self.__add_new_cell(new_daughter_cell)
 
                         # Writes cell properties to data list
                         if t % rf == 0 or t == tf:
@@ -275,7 +292,7 @@ class Column_Scaffold:
                 # Neighboring pores are not all full
                 else:
                     # Perform migration on parent cell
-                    self.__perform_migration(cell, n_cap, ts, False)
+                    self.__cell_migration(cell, n_cap, ts, False)
 
                     # Generate a random replicate rate number based on specified replication rate
                     rp = self.__generate_replication_rate_number(rep_rate)
@@ -287,16 +304,13 @@ class Column_Scaffold:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                     else:
                         # Generate a new daughter cell and perform migration on it
-                        new_daughter_cell = self.__new_daughter_cell(cell, t)
+                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
                         daughter_n_cap = self.__neighbor_conditional_check(new_daughter_cell)
-                        self.__perform_migration(new_daughter_cell, daughter_n_cap, ts, True)
+                        self.__cell_migration(new_daughter_cell, daughter_n_cap, ts, True)
 
                         # Replicated cell must migrate to exist
                         if new_daughter_cell.moves_made != 0:
-                            self.cell_objs.append(new_daughter_cell)
-
-                            # Increment cell ID and cell count
-                            self.increment_cell_tracking()
+                            self.__add_new_cell(new_daughter_cell)
 
                         # Writes cell properties to data list
                         if t % rf == 0 or t == tf:
@@ -305,20 +319,12 @@ class Column_Scaffold:
                             if new_daughter_cell.moves_made != 0:
                                 data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
 
-        # Update scaffold time
-        self.__time += ts
-
-    def increment_cell_tracking(self):
-        """Update cell count and cell ID counter"""
-        self.__cell_ID_counter += 1
-        self.__cell_count += 1
-
     @staticmethod
     def __generate_replication_rate_number(rep_rate):
-        """generates a replication rate number that determines if replication occurs
+        """Generates a replication rate number based on the rate of replication
 
         :param rep_rate: replication rate (s^-1)
-        :return: replicate rate number
+        :return: replication rate number
         """
         rp = 0
         # Replicate rate is not set to zero
@@ -332,69 +338,33 @@ class Column_Scaffold:
                 rp = r.randint(1, round(1 / rep_rate))
         return rp
 
-    def __perform_migration(self, cell, neighbor_capacity, ts, is_new_daughter_cell):
-        """Performs cell migration on the specified cell"""
-        # --------------------------------------------------------------------------
-        # Choose a random direction for migration
-        # --------------------------------------------------------------------------
-        migration_direction = None
-        # Ensure direction is not full or out of bounds
-        while True:
-            migration_direction = r.randint(1, 6)
+    def __cell_migration(self, cell, neighbor_capacity, ts, is_new_daughter_cell):
+        """Performs cell migration on the specified cell
+        :param cell: Cell to perform migration on
+        :param neighbor_capacity: List representing the capacity status of neighboring pores/pore segments
+        :param ts: Simulation time step
+        :param is_new_daughter_cell: Represents if cell is a daughter cell
+        """
+        # Choose direction of migration
+        migration_direction = self.__choose_migration_direction(neighbor_capacity)
 
-            # Can migrate in the ±X, Y, and Z directions at bottom of scaffold
-            if self.__can_migrate_horizontally(cell):
-                if (neighbor_capacity[0]) and (migration_direction == 1):
-                    continue
-                elif (neighbor_capacity[1]) and (migration_direction == 2):
-                    continue
-                elif (neighbor_capacity[2]) and (migration_direction == 3):
-                    continue
-                elif (neighbor_capacity[3]) and (migration_direction == 4):
-                    continue
-                elif (neighbor_capacity[4]) and (migration_direction == 5):
-                    continue
-                elif (neighbor_capacity[5]) and (migration_direction == 6):
-                    continue
-                else:
-                    break;
-            # Can only migrate in the ±Z direction if not at bottom of scaffold
-            else:
-                if (neighbor_capacity[4]) and (migration_direction == 5):
-                    continue
-                elif (neighbor_capacity[5]) and (migration_direction == 6):
-                    continue
-                else:
-                    break
-
-        # --------------------------------------------------------------------------
         # Calculate probability to migrate in chosen direction
-        # --------------------------------------------------------------------------
-        # Calculate distance
-        cell_velocity = \
-            self.__calculate_cell_velocity(cell, migration_direction)  # Cell velocity in chosen direction (µm/s)
-        distance_between_segments = \
-            self.__column_array[1] - self.__column_array[0]            # Distance between neighboring pore segments (µm)
-        distance_between_columns = \
-            self.__pore_array[1] - self.__pore_array[0]                # Distance between neighboring columns (µm)
-        cell_distance_traveled = cell_velocity * ts * 3600             # Distance cell can travel (µm)
+        probability_of_migration = self.__calculate_migration_probability(cell, migration_direction, ts)
 
-        # Calculate probability to migrate as a ratio between distance cell can travel and distance between pores
-        probability_of_migration = 0
-        if migration_direction == 5 or migration_direction == 6:
-            probability_of_migration = cell_distance_traveled/distance_between_segments * 100   # (%)
-        else:
-            probability_of_migration = cell_distance_traveled/distance_between_columns * 100
+        # Move cell in designated direction
+        self.__move_cell(cell, is_new_daughter_cell, migration_direction, probability_of_migration)
 
-        # Warn if probability of migration exceeds 100%
-        # if probability_of_migration > 100:
-            # print("Warning: migration rate too high, consider turning time step down")
+    def __move_cell(self, cell, is_new_daughter_cell, migration_direction, probability_of_migration):
+        """
+        Moves a cell in a given direction
 
-        # --------------------------------------------------------------------------
-        # Cell Migration
-        # --------------------------------------------------------------------------
+        :param cell: Cell to move
+        :param is_new_daughter_cell: Represents if cell is a daughter cell
+        :param migration_direction: Direction of migration
+        :param probability_of_migration: Probability cell will migrate (%/100)
+        """
         # Generates a number between 1 and 100 to determine if cell will migrate
-        random_migration_number = r.randint(0, 100000)/1000
+        random_migration_number = r.randint(0, 100000) / 1000
 
         # Migrate in chosen direction based on migration probability
         if probability_of_migration > random_migration_number:
@@ -407,6 +377,7 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.x += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
             elif migration_direction == 2:
                 # X < 0
                 if not is_new_daughter_cell:
@@ -420,6 +391,7 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.y += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
             elif migration_direction == 4:
                 # Y < 0
                 if not is_new_daughter_cell:
@@ -433,12 +405,79 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.z += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
             elif migration_direction == 6:
                 # Z < 0
                 if not is_new_daughter_cell:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.z -= 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+
+    def __calculate_migration_probability(self, cell, migration_direction, ts):
+        """
+        Calculates the probability of migration probability based on the time step and cell speed
+
+        :param cell: Cell to calculate cell speed
+        :param migration_direction: Direction of migration
+        :param ts: Simulation time step (hr)
+        :return: Probability cell will migrate (%)
+        """
+        # Calculate cell velocity
+        cell_velocity = \
+            self.__calculate_cell_velocity(cell, migration_direction)  # Cell velocity in chosen direction (µm/s)
+
+        # Calculate distance between pore segments and pore columns
+        distance_between_segments = \
+            self.__column_array[1] - self.__column_array[0]  # Distance between neighboring pore segments (µm)
+        distance_between_columns = \
+            self.__pore_array[1] - self.__pore_array[0]  # Distance between neighboring columns (µm)
+
+        # Calculate probability to migrate as a ratio between distance cell can travel and distance between pores
+        cell_distance_traveled = cell_velocity * ts * 3600  # Distance cell can travel (µm)
+
+        probability_of_migration = 0
+        if migration_direction == 5 or migration_direction == 6:
+            probability_of_migration = cell_distance_traveled / distance_between_segments * 100  # (%)
+        else:
+            probability_of_migration = cell_distance_traveled / distance_between_columns * 100  # (%)
+
+        # Warn if probability of migration exceeds 100%
+        # if probability_of_migration > 100:
+            # print("Warning: migration rate too high, consider turning time step down")
+
+        # Return the probability of migration as a percentage
+        return probability_of_migration
+
+    def __choose_migration_direction(self, neighbor_capacity):
+        """
+        Chooses a random direction of a cell to a non-full pore
+
+        :param neighbor_capacity: List representing the capacity of neighboring pores
+        :return: Chosen direction of migration
+        """
+        migration_direction = None
+        # Ensure direction is not full or out of bounds
+        while True:
+            migration_direction = r.randint(1, 6)
+
+            # Choose migration direction in a non-full direction
+            if (neighbor_capacity[0]) and (migration_direction == 1):
+                continue
+            elif (neighbor_capacity[1]) and (migration_direction == 2):
+                continue
+            elif (neighbor_capacity[2]) and (migration_direction == 3):
+                continue
+            elif (neighbor_capacity[3]) and (migration_direction == 4):
+                continue
+            elif (neighbor_capacity[4]) and (migration_direction == 5):
+                continue
+            elif (neighbor_capacity[5]) and (migration_direction == 6):
+                continue
+            else:
+                break;
+
+        # Return the direction of migration towards a non-full pore
+        return migration_direction
 
     def __calculate_cell_velocity(self, cell, migration_direction):
         """
@@ -512,7 +551,7 @@ class Column_Scaffold:
         else:
             traction_hydrostatic = f_traction
 
-        v = 1E-6 * c*eta/(traction_hydrostatic)      # Cell velocity to planned pore to migrate to (µm/s)
+        v = traction_hydrostatic/(c*eta)      # Cell velocity to planned pore to migrate to (µm/s)
 
         # Negative velocity indicates hydrostatic force dominates, return 0
         if v < 0:
@@ -520,16 +559,36 @@ class Column_Scaffold:
         return v
 
     def __can_migrate_horizontally(self, cell):
-        # Define z-bound from the bottom of the scaffold in which the cells can perform
-        # lateral migration
-        z_percentage = 20       # %
+        """
+        Dictates whether a cell is low enough in the scaffold to perform horizontal migration
+
+        :param cell: Cell to check
+        :return: If the cell can perform horizontal migration
+        """
+        # Define z-bound from the bottom of the scaffold in which the cells can perform lateral migration
+        z_percentage = 20   # %
         z_bound = self.__dimension * z_percentage/100
 
         # Find cell's current position
         cell_z_position = self.__column_array[cell.z]
+
+        # Return if cell can migration horizontally
         if cell_z_position <= z_bound:
             return True
         return False
+
+    def __add_new_cell(self, cell):
+        """
+        Adds a new cell to the cell object array
+
+        :param cell: Cell to add to array
+        """
+        # Add new cell to object array
+        self.cell_objs.append(cell)
+
+        # Increment counters
+        self.__cell_ID_counter += 1
+        self.__cell_count += 1
 
     def __neighbor_conditional_check(self, cell_to_check):
         """Checks whether the cell's current pore's neighboring cells are full
@@ -545,25 +604,25 @@ class Column_Scaffold:
         z_bounds = self.__pore_column_layers - 1
 
         # Check +X direction
-        if (cell_to_check.x + 1) > x_y_bounds or self.__can_migrate_horizontally(cell_to_check):
+        if (cell_to_check.x + 1) > x_y_bounds or not self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[0] = True
         else:
             neighbor_conditions[0] = self.scaffold[cell_to_check.x + 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check -X direction
-        if (cell_to_check.x - 1) < 0 and self.__can_migrate_horizontally(cell_to_check):
+        if (cell_to_check.x - 1) < 0 or not self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[1] = True
         else:
             neighbor_conditions[1] = self.scaffold[cell_to_check.x - 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check +Y direction
-        if (cell_to_check.y + 1) > x_y_bounds and self.__can_migrate_horizontally(cell_to_check):
+        if (cell_to_check.y + 1) > x_y_bounds or not self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[2] = True
         else:
             neighbor_conditions[2] = self.scaffold[cell_to_check.x][cell_to_check.y + 1][cell_to_check.z].is_full()
 
         # Check -Y direction
-        if (cell_to_check.y - 1) < 0 and self.__can_migrate_horizontally(cell_to_check):
+        if (cell_to_check.y - 1) < 0 or not self.__can_migrate_horizontally(cell_to_check):
             neighbor_conditions[3] = True
         else:
             neighbor_conditions[3] = self.scaffold[cell_to_check.x][cell_to_check.y - 1][cell_to_check.z].is_full()
@@ -586,7 +645,7 @@ class Column_Scaffold:
         # Return crowding conditions of neighboring cells
         return neighbor_conditions
 
-    def __new_daughter_cell(self, parent_cell, time_in):
+    def __generate_new_daughter_cell(self, parent_cell, time_in):
         """Generate a new daughter cell based on the parent cell. Returns the new daughter cell object
 
         :param parent_cell: Parent cell to based daughter cell off of
