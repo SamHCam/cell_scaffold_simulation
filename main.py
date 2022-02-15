@@ -74,17 +74,17 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 # Simulation and Scaffold Characteristics
 # --------------------------------------------------------------------------
 # Simulation Parameters
-time_step = 0.1  # Time "Step" forward each time to perform migration and/or replication (hour)
+time_step = 0.25  # Time "Step" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
-dimension = 14550                   # Side length of cubical Scaffold (µm)
+dimension = 5000                   # Side length of cubical Scaffold (µm)
 porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
 ligand_factor = 100                 # Percentage of ligands compared to normal (%)
 pore_size = 23.9                    # Diameter of pores in the scaffold (µm)
 packing_density = 80                # Fraction of void or empty volume within the scaffold that can be occupied by
                                     # cells (%)
-pore_layer_count = 100              # The number of layers to represent each pore column
+pore_layer_count = 30               # The number of layers to represent each pore column
 
 # Cell parameters:
 cell_diameter = 35                  # Cell diameter (µm)
@@ -92,10 +92,10 @@ initial_cell_count = 60000          # Initial seeding of scaffold with cells
 replication_probability = 7.72E-06  # Fixed probability that a cell will replicate (s^-1)
 
 # Simulation Parameters:
-simulation_time = 140               # Total simulation time (hour)
-writing_frequency = 1               # Frequency of how often the program writes all stored data to the
+simulation_time = 168               # Total simulation time (hour)
+writing_frequency = 0.25               # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
-recording_frequency = 1             # Frequency of how often the program records data (hours/record to data list)
+recording_frequency = 0.25             # Frequency of how often the program records data (hours/record to data list)
 
 # Header Information
 csv_file_name = "Sim_" + str(scaffold_stiffness) + "MPa_" + str(pore_size) + "PDµm_" + str(

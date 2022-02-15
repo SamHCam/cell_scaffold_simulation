@@ -193,13 +193,12 @@ class Column_Scaffold:
         center_point = end_point/2
 
         # Determine a seeding radius
-        radius = int((end_point - center_point)/2)
+        radius = int(3 * (end_point - center_point) / 4)
 
         count = 0
         # Seed each cell object
         for cell in self.cell_objs:
             count += 1
-            print(count)
 
             # Assign a unique ID for each seeded cell
             cell.ID = self.__cell_ID_counter
@@ -216,7 +215,7 @@ class Column_Scaffold:
                 # Generate random position at the top of the scaffold
                 new_position = [int(center_point + rand_radius * math.cos(rand_theta)),
                                 int(center_point + rand_radius * math.sin(rand_theta)),
-                                r.randint(len(self.__column_array) - 6, len(self.__column_array) - 1)]
+                                r.randint(len(self.__column_array) - 10, len(self.__column_array) - 1)]
 
                 # Check if random position is full
                 pore_destination = self.scaffold[new_position[0]][new_position[1]][new_position[2]]
@@ -535,7 +534,8 @@ class Column_Scaffold:
         h_cell = self.__column_array[cell.z]                                # Z-position of cell (µm)
         h_scaffold = self.__dimension                                       # Height of scaffold (µm)
 
-        f_hydrostatic = rho * g * (h_scaffold - h_cell) * 1E-6 * next_pore.surface_area        # Hydrostatic Force (pN)
+        f_hydrostatic = rho * g * (h_scaffold - h_cell) * 1E-6 * np.pi * (self.__pore_diameter/2)**2  # Hydrostatic Force (pN)
+        # print(f_hydrostatic)
 
         # Force of Drag Calculation
         c = 6 * np.pi * self.__cell_diameter/2      # Constant c depends on the shape of a cell for a spherical cell
