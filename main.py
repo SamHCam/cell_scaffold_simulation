@@ -57,13 +57,11 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
                                        rp * 3600 * time_step)
 
         # Write data to the data list at specified intervals
-        if time % wf == 0 or time == time_final:
+        if time % wf == 0:
             # Record data in list
             write_data(data, file_name)
             # Clear out data list after recording
             data = []
-
-        print("Cell Count: " + str(scaffold.get_cell_count()))  # TODO: Remove, testing purposes only
 
         # Add time step increment
         time += ts  # hours
@@ -77,7 +75,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 time_step = 0.25  # Time "Step" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
-dimension = 5000                   # Side length of cubical Scaffold (µm)
+dimension = 20000                   # Side length of cubical Scaffold (µm)
 porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
 ligand_factor = 100                 # Percentage of ligands compared to normal (%)
@@ -92,16 +90,17 @@ initial_cell_count = 60000          # Initial seeding of scaffold with cells
 replication_probability = 7.72E-06  # Fixed probability that a cell will replicate (s^-1)
 
 # Simulation Parameters:
-simulation_time = 168               # Total simulation time (hour)
-writing_frequency = 0.25               # Frequency of how often the program writes all stored data to the
+simulation_time = 504               # Total simulation time (hour)
+writing_frequency = 20              # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
-recording_frequency = 0.25             # Frequency of how often the program records data (hours/record to data list)
+recording_frequency = 20            # Frequency of how often the program records data (hours/record to data list)
 
 # Header Information
 csv_file_name = "Sim_" + str(scaffold_stiffness) + "MPa_" + str(pore_size) + "PDµm_" + str(
     cell_diameter) + "CDµm_" + str(replication_probability) + "RP_" + str(ligand_factor) + "LF%_" + str(
     porosity) + "PS%_" + str(pore_layer_count) + "CC" + ".csv"
-file_header = [["Time (hour)", "Cell ID", "Cell Generation", "Number of Cell Moves", "X (µm)", "Y (µm)", "Z (µm)"]]
+file_header = [["Time (hour)", "Cell ID", "Cell Generation", "# of Horizontal Cell Moves", "# of Vertical Cell Moves",
+                "X (µm)", "Y (µm)", "Z (µm)"]]
 
 # --------------------------------------------------------------------------
 # Generate scaffold environment

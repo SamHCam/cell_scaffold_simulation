@@ -31,16 +31,19 @@ class Column_Scaffold:
         # Generates various scaffold characteristics from method parameters
         pore_array, pore_column_segments, pore_cell_max, scaffold_cell_max, column_array, pore_columns, seg_height = \
             self.__generate_pore_scaffold_properties(dimension, porosity, pore_diameter, packing_density, cell_diameter,
-                                                     pore_column_layers)
+                                                     pore_column_layers, column_spacing)
 
         # Column properties
         self.__pore_columns = pore_columns                  # Number of columns used to represent the scaffold
         self.__pore_column_layers = pore_column_layers      # The number of column layers/segments to represent a pore
         self.__pore_column_segments = pore_column_segments  # Total number of pore column segments in the scaffold
         self.__pore_segment_height = seg_height             # Height of pore column segment
+        self.__column_spacing = column_spacing              # Distance between adjacent columns
 
         # Scaffold properties
         self.__dimension = dimension                        # Side length of cubical scaffold (µm)
+        self.__scaffold_radius = 14000/2                    # Diameter of scaffold (µm)
+        self.__scaffold_height = 20000                      # Heigh of scaffold (µm)
         self.__pore_diameter = pore_diameter                # The diameters of pores in the scaffold (µm)
         self.__cell_diameter = cell_diameter                # The cell diameter of cells that can be seeded in
                                                             # scaffold (µm)
@@ -52,6 +55,8 @@ class Column_Scaffold:
                                                             # pore in the X and Y directions
         self.__column_array = column_array                  # An array that represents the coordinates of each
                                                             # pore segment in the Z directions
+        self.__scaffold_center_index = \
+            int((self.__scaffold_height % self.__column_spacing)/2) # Center index of scaffold
 
         # Crowding conditions
         self.__pore_cell_max = pore_cell_max                # The maximum number of cells one pore segment in the
@@ -68,6 +73,8 @@ class Column_Scaffold:
                            for z in range(pore_column_layers)]
                           for y in range(len(pore_array))]
                          for x in range(len(pore_array))]
+
+        self.__x_bound, self.__y_bound = self.__calcualte_scaffold_bounds
 
         # --------------------------------------------------------------------------
         # Initializes and stores cell objects that are in the scaffold
@@ -106,75 +113,93 @@ class Column_Scaffold:
         return self.__time
 
     # --------------------------------------------------------------------------
-    # Private Class Methods
+    # Public Methods
     # --------------------------------------------------------------------------
-    @staticmethod
-    def __generate_pore_scaffold_properties(dimension, porosity, pore_diameter, packing_density, cell_diameter,
-                                            pore_column_layers):
-        """Calculates scaffold properties related to the number of pores, pore distribution, and pore cell capacity.
+    def migration_replication(self, data, ts, tf, rf, rep_rate):
+        """Performs a migration and replication cycle on all cells in the scaffold at a specified replication rate.
 
-        :param dimension: side dimension of cubical scaffold (µm).
-        :param porosity: empty or void volume fraction of the scaffold (%).
-        :param pore_diameter: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
-        :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
-        :param cell_diameter: diameter of cells occupying scaffold (µm).
-        :param pore_column_layers: Number of layers in which to represent segments of the cylindrical columns
-        :return: distribution of pore columns for the X, Y dimensions, number of pores, maximum cells per
-                 pore, maximum cells in scaffold, distribution of pore segments in the Z direction, number of pore
-                 columns, and the height pore pore segments
+        :param data: Stores data in rows in an expandable list
+        :param ts: specifies the simulation's time-step (hour)
+        :param tf: Time in which the simulation ends (hour)
+        :param rf: Recording frequency
+        :param rep_rate: Cell replication rate (s^-1)
         """
-        # --------------------------------------------------------------------------
-        # Calculates volume that is available to pores
-        # --------------------------------------------------------------------------
-        scaffold_volume = dimension**3                          # Scaffold volume, assuming cube (µm^3)
-        scaffold_porous_volume = porosity * scaffold_volume     # Amount of void volume in scaffold (µm^3)
+        # Update scaffold time
+        self.__time += ts
 
-        # --------------------------------------------------------------------------
-        # Calculates number of pore columns, pore segments, and column distribution in the scaffold
-        # --------------------------------------------------------------------------
-        pore_column_cs_area = np.pi * (pore_diameter / 2) ** 2             # Calculates the pore-column cross-sectional
-                                                                           # area (µm^2)
-        pore_column_volume = pore_column_cs_area * dimension               # Volume of one porous column (µm^3)
-        pore_column_count = scaffold_porous_volume / pore_column_volume    # Total potential pore columns in scaffold
-        pore_columns_per_side = m.floor(pore_column_count ** (1/2))        # Calculates the number of pores per side and
-                                                                           # maintains scaffold's cubical nature
+        # Get current time elapsed
+        t = round(self.__time, 2)
 
-        pore_columns = pore_columns_per_side ** 2                   # Recalculate new pore-column number to maintain a
-                                                                    # cubical scaffold
-        pore_segment_count = pore_columns * pore_column_layers      # Calculate number of pore segments in scaffold
+        # Ensure unbiased cellular migration and replication
+        r.shuffle(self.cell_objs)
 
-        # --------------------------------------------------------------------------
-        # Create arrays to represent positions in the scaffold
-        # --------------------------------------------------------------------------
-        pore_array = \
-            np.linspace(0, dimension, num=int(pore_columns_per_side)).tolist()
-        column_array = \
-            np.linspace(0, dimension, num=int(pore_column_layers)).tolist()
+        # Migration and replication of parent and daughter cells
+        for cell in self.cell_objs:
 
-        # Find the height of column segments
-        segment_height = column_array[1] - column_array[0]
+            # Get current status of neighboring pore capacity
+            n_cap = self.__boundary_check(cell)
 
-        # --------------------------------------------------------------------------
-        # Calculate the volume of pore_column segments
-        # --------------------------------------------------------------------------
-        # Calculate pore segment volume and cell volume
-        pore_segment_volume = pore_column_volume / pore_column_layers   # Volume of one segment of the pore column
-        cell_volume = 4 / 3 * np.pi * (cell_diameter / 2) ** 3  # Calculates the volume of a cell in the scaffold
-                                                                # assuming spherical (µm^3)
+            # If all pores, including the pore the cell is in, are full then no movement and no replication occurs
+            if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5] and n_cap[6]:
+                # Writes cell properties to data list
+                if t % rf == 0 or t == tf:
+                    data.append(cell.write_data(self.__pore_array, self.__column_array, t))
 
-        # Calculate the maximum number of cells in one pore segment based on volumes
-        pore_segment_cell_max = m.floor(pore_segment_volume * packing_density / cell_volume)
+            else:
+                # Only the pore the cell is currently in is not full
+                if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5]:
+                    # Generate a random replicate rate number based on specified replication rate
+                    rp = self.__generate_replication_rate_number(rep_rate)
 
-        # Invoke error when the pore segment is too small to hold at least one cell
-        if pore_segment_cell_max < 1:
-            raise Exception("Current pore segment volume is too small to hold at least one cell.")
+                    # Replicate only if replication number matches
+                    if rp != 1:
+                        # Writes cell properties to data list
+                        if t % rf == 0 or t == tf:
+                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
 
-        # Calculate maximum number of cells that can occupy the scaffold
-        max_cells = pore_segment_cell_max * pore_columns * pore_column_layers
+                    # Replication of cell occurs if replication condition is achieved
+                    else:
+                        # Create a new daughter cell
+                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
 
-        # Returns scaffold characteristics
-        return pore_array, pore_segment_count, pore_segment_cell_max, max_cells, column_array, pore_columns, \
-               segment_height
+                        # New cell with an identical pore location to its parent is added to the list of cell objects
+                        self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                        self.__add_new_cell(new_daughter_cell)
+
+                        # Writes cell properties to data list
+                        if t % rf == 0 or t == tf:
+                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+                            data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
+
+                # Neighboring pores are not all full
+                else:
+                    # Perform migration on parent cell
+                    self.__cell_migration(cell, n_cap, ts, False)
+
+                    # Generate a random replicate rate number based on specified replication rate
+                    rp = self.__generate_replication_rate_number(rep_rate)
+
+                    # Replicate only if replication number matches
+                    if rp != 1:
+                        # Writes cell properties to data list
+                        if t % rf == 0 or t == tf:
+                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+                    else:
+                        # Generate a new daughter cell and perform migration on it
+                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
+                        daughter_n_cap = self.__boundary_check(new_daughter_cell)
+                        self.__cell_migration(new_daughter_cell, daughter_n_cap, ts, True)
+
+                        # Replicated cell must migrate to exist
+                        if new_daughter_cell.moves_made != 0:
+                            self.__add_new_cell(new_daughter_cell)
+
+                        # Writes cell properties to data list
+                        if t % rf == 0 or t == tf:
+                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+                            # Write daughter cell properties to data list only if it exists
+                            if new_daughter_cell.moves_made != 0:
+                                data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
 
     # --------------------------------------------------------------------------
     # Seeding Methods
@@ -230,93 +255,105 @@ class Column_Scaffold:
             data.append(cell.write_data(self.__pore_array, self.__column_array, self.__time))
 
     # --------------------------------------------------------------------------
-    # Public Methods
+    # Private Class Methods
     # --------------------------------------------------------------------------
-    def migration_replication(self, data, ts, tf, rf, rep_rate):
-        """Performs a migration and replication cycle on all cells in the scaffold at a specified replication rate.
+    @staticmethod
+    def __generate_pore_scaffold_properties(dimension, porosity, pore_diameter, packing_density, cell_diameter,
+                                            pore_column_layers):
+        """Calculates scaffold properties related to the number of pores, pore distribution, and pore cell capacity.
 
-        :param data: Stores data in rows in an expandable list
-        :param ts: specifies the simulation's time-step (hour)
-        :param tf: Time in which the simulation ends (hour)
-        :param rf: Recording frequency
-        :param rep_rate: Cell replication rate (s^-1)
+        :param dimension: side dimension of cubical scaffold (µm).
+        :param porosity: empty or void volume fraction of the scaffold (%).
+        :param pore_diameter: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
+        :param packing_density: fraction of void or empty volume within the scaffold that can be occupied by cells (%).
+        :param cell_diameter: diameter of cells occupying scaffold (µm).
+        :param pore_column_layers: Number of layers in which to represent segments of the cylindrical columns
+        :return: distribution of pore columns for the X, Y dimensions, number of pores, maximum cells per
+                 pore, maximum cells in scaffold, distribution of pore segments in the Z direction, number of pore
+                 columns, and the height pore pore segments
         """
-        # Update scaffold time
-        self.__time += ts
+        # --------------------------------------------------------------------------
+        # Calculates volume that is available to pores
+        # --------------------------------------------------------------------------
+        scaffold_volume = dimension**3                          # Scaffold volume, assuming cube (µm^3)
+        scaffold_porous_volume = porosity * scaffold_volume     # Amount of void volume in scaffold (µm^3)
 
-        # Get current time elapsed
-        t = round(self.__time, 2)
+        # --------------------------------------------------------------------------
+        # Calculates number of pore columns, pore segments, and column distribution in the scaffold
+        # --------------------------------------------------------------------------
+        pore_column_cs_area = np.pi * (pore_diameter / 2) ** 2             # Calculates the pore-column cross-sectional
+                                                                           # area (µm^2)
+        pore_column_volume = pore_column_cs_area * dimension               # Volume of one porous column (µm^3)
+        pore_column_count = scaffold_porous_volume / pore_column_volume    # Total potential pore columns in scaffold
+        pore_columns_per_side = m.floor(pore_column_count ** (1/2))        # Calculates the number of pores per side and
+                                                                           # maintains scaffold's cubical nature
 
-        # Ensure unbiased cellular migration and replication
-        r.shuffle(self.cell_objs)
+        pore_columns = pore_columns_per_side ** 2                   # Recalculate new pore-column number to maintain a
+                                                                    # cubical scaffold
+        pore_segment_count = pore_columns * pore_column_layers      # Calculate number of pore segments in scaffold
 
-        # Migration and replication of parent and daughter cells
-        for cell in self.cell_objs:
+        # --------------------------------------------------------------------------
+        # Create arrays to represent positions in the scaffold
+        # --------------------------------------------------------------------------
+        pore_array = \
+            np.linspace(0, dimension, num=int(pore_columns_per_side)).tolist()
+        column_array = \
+            np.linspace(0, dimension, num=int(pore_column_layers)).tolist()
 
-            # Get current status of neighboring pore capacity
-            n_cap = self.__neighbor_conditional_check(cell)
+        # Find the height of column segments
+        segment_height = column_array[1] - column_array[0]
 
-            # If all pores, including the pore the cell is in, are full then no movement and no replication occurs
-            if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5] and n_cap[6]:
-                # Writes cell properties to data list
-                if t % rf == 0 or t == tf:
-                    data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+        # Find the distance between columns
+        column_spacing = pore_array[1] - pore_array[0]
 
-            else:
-                # Only the pore the cell is currently in is not full
-                if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5]:
-                    # Generate a random replicate rate number based on specified replication rate
-                    rp = self.__generate_replication_rate_number(rep_rate)
+        # --------------------------------------------------------------------------
+        # Calculate the volume of pore_column segments
+        # --------------------------------------------------------------------------
+        # Calculate pore segment volume and cell volume
+        pore_segment_volume = pore_column_volume / pore_column_layers   # Volume of one segment of the pore column
+        cell_volume = 4 / 3 * np.pi * (cell_diameter / 2) ** 3  # Calculates the volume of a cell in the scaffold
+                                                                # assuming spherical (µm^3)
 
-                    # Replicate only if replication number matches
-                    if rp != 1:
-                        # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
-                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
+        # Calculate the maximum number of cells in one pore segment based on volumes
+        pore_segment_cell_max = m.floor(pore_segment_volume * packing_density / cell_volume)
 
-                    # Replication of cell occurs if replication condition is achieved
-                    else:
-                        # Create a new daughter cell
-                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
+        # Invoke error when the pore segment is too small to hold at least one cell
+        if pore_segment_cell_max < 1:
+            raise Exception("Current pore segment volume is too small to hold at least one cell.")
 
-                        # New cell with an identical pore location to its parent is added to the list of cell objects
-                        self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
-                        self.__add_new_cell(new_daughter_cell)
+        # Calculate maximum number of cells that can occupy the scaffold
+        max_cells = pore_segment_cell_max * pore_columns * pore_column_layers
 
-                        # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
-                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
-                            data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
+        # Returns scaffold characteristics
+        return pore_array, pore_segment_count, pore_segment_cell_max, max_cells, column_array, pore_columns, \
+               segment_height, column_spacing
 
-                # Neighboring pores are not all full
-                else:
-                    # Perform migration on parent cell
-                    self.__cell_migration(cell, n_cap, ts, False)
+    def __check_scaffold_bounds(self, x_tic, y_tic, z_tic, cell_to_check):
+        # Increment/decrement cell position appropriately
+        new_x = cell_to_check + x_tic
+        new_y = cell_to_check + y_tic
+        new_z = cell_to_check + z_tic
 
-                    # Generate a random replicate rate number based on specified replication rate
-                    rp = self.__generate_replication_rate_number(rep_rate)
+        # Check for negative index
+        if new_x < 0 or new_y < 0 or new_z < 0:
+            return False
+        # Check if Z is out of bounds
+        elif self.__column_array[new_z] > self.__scaffold_height:
+            return False
+        # Check if X and Y is out of bounds
+        else:
+            # Calculate centered X and Y positions
+            center_pos = self.__pore_array[self.__scaffold_center_index]
+            new_x_pos = self.__pore_array[new_x] - center_pos
+            new_y_pos = self.__pore_array[new_y] - center_pos
 
-                    # Replicate only if replication number matches
-                    if rp != 1:
-                        # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
-                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
-                    else:
-                        # Generate a new daughter cell and perform migration on it
-                        new_daughter_cell = self.__generate_new_daughter_cell(cell, t)
-                        daughter_n_cap = self.__neighbor_conditional_check(new_daughter_cell)
-                        self.__cell_migration(new_daughter_cell, daughter_n_cap, ts, True)
+            cell_radius_position = abs(np.sqrt(new_x**2 + new_y**2))
 
-                        # Replicated cell must migrate to exist
-                        if new_daughter_cell.moves_made != 0:
-                            self.__add_new_cell(new_daughter_cell)
-
-                        # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
-                            data.append(cell.write_data(self.__pore_array, self.__column_array, t))
-                            # Write daughter cell properties to data list only if it exists
-                            if new_daughter_cell.moves_made != 0:
-                                data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
+            # Check if cell radius position is within scaffold bounds
+            if cell_radius_position > self.__scaffold_radius:
+                return false
+        # Cell within bounds, return true
+        return true
 
     @staticmethod
     def __generate_replication_rate_number(rep_rate):
@@ -367,15 +404,14 @@ class Column_Scaffold:
 
         # Migrate in chosen direction based on migration probability
         if probability_of_migration > random_migration_number:
-            # Update number of moves made
-            cell.moves_made += 1
-
             if migration_direction == 1:
                 # X > 0
                 if not is_new_daughter_cell:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.x += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.h_moves_made += 1
 
             elif migration_direction == 2:
                 # X < 0
@@ -383,6 +419,8 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.x -= 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.h_moves_made += 1
 
             elif migration_direction == 3:
                 # Y > 0
@@ -390,6 +428,8 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.y += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.h_moves_made += 1
 
             elif migration_direction == 4:
                 # Y < 0
@@ -397,6 +437,8 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.y -= 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.h_moves_made += 1
 
             elif migration_direction == 5:
                 # Z > 0
@@ -404,6 +446,8 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.z += 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.v_moves_made += 1
 
             elif migration_direction == 6:
                 # Z < 0
@@ -411,6 +455,8 @@ class Column_Scaffold:
                     self.scaffold[cell.x][cell.y][cell.z].cell_number -= 1
                 cell.z -= 1
                 self.scaffold[cell.x][cell.y][cell.z].cell_number += 1
+                # Update number of moves made
+                cell.v_moves_made += 1
 
     def __calculate_migration_probability(self, cell, migration_direction, ts):
         """
@@ -590,7 +636,7 @@ class Column_Scaffold:
         self.__cell_ID_counter += 1
         self.__cell_count += 1
 
-    def __neighbor_conditional_check(self, cell_to_check):
+    def __boundary_check(self, cell_to_check):
         """Checks whether the cell's current pore's neighboring cells are full
 
         :param cell_to_check: Cell to check neighboring pore crowding conditions
@@ -599,42 +645,38 @@ class Column_Scaffold:
         # Generate cell conditions
         neighbor_conditions = [False, False, False, False, False, False, False]
 
-        # Evaluate neighbor cell conditions as well as boundary conditions
-        x_y_bounds = len(self.__pore_array) - 1
-        z_bounds = self.__pore_column_layers - 1
-
         # Check +X direction
-        if (cell_to_check.x + 1) > x_y_bounds or not self.__can_migrate_horizontally(cell_to_check):
+        if self.__check_scaffold_bounds(1, 0, 0) and cell_to_check.z == 0:
             neighbor_conditions[0] = True
         else:
             neighbor_conditions[0] = self.scaffold[cell_to_check.x + 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check -X direction
-        if (cell_to_check.x - 1) < 0 or not self.__can_migrate_horizontally(cell_to_check):
+        if self.__check_scaffold_bounds(-1, 0, 0) and cell_to_check.z == 0:
             neighbor_conditions[1] = True
         else:
             neighbor_conditions[1] = self.scaffold[cell_to_check.x - 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check +Y direction
-        if (cell_to_check.y + 1) > x_y_bounds or not self.__can_migrate_horizontally(cell_to_check):
+        if self.__check_scaffold_bounds(0, 1, 0) and cell_to_check.z == 0:
             neighbor_conditions[2] = True
         else:
             neighbor_conditions[2] = self.scaffold[cell_to_check.x][cell_to_check.y + 1][cell_to_check.z].is_full()
 
         # Check -Y direction
-        if (cell_to_check.y - 1) < 0 or not self.__can_migrate_horizontally(cell_to_check):
+        if self.__check_scaffold_bounds(0, -1, 0) and cell_to_check.z == 0:
             neighbor_conditions[3] = True
         else:
             neighbor_conditions[3] = self.scaffold[cell_to_check.x][cell_to_check.y - 1][cell_to_check.z].is_full()
 
         # Check +Z direction
-        if (cell_to_check.z + 1) > z_bounds:
+        if self.__check_scaffold_bounds(0, 0, 1):
             neighbor_conditions[4] = True
         else:
             neighbor_conditions[4] = self.scaffold[cell_to_check.x][cell_to_check.y][cell_to_check.z + 1].is_full()
 
         # Check -Z direction
-        if (cell_to_check.z - 1) < 0:
+        if self.__check_scaffold_bounds(0, 0, -1):
             neighbor_conditions[5] = True
         else:
             neighbor_conditions[5] = self.scaffold[cell_to_check.x][cell_to_check.y][cell_to_check.z - 1].is_full()
@@ -704,7 +746,8 @@ class Column_Scaffold:
             self.z = 0                              # Z-position of cell within scaffold
             self.ID = 0                             # Unique identifier
             self.generation = 1                     # Cell generation with respect to seeding generation (generation 1)
-            self.moves_made = 0                     # Total number of moves made within scaffold
+            self.h_moves_made = 0                   # Total number of moves made horizontally (±X or ±Y direction)
+            self.v_moves_made = 0                   # Total number of moves made vertically (±Z direction)
             self.time_in = time_in                  # Time in which cell entered the scaffold (hours)
             self.cell_diameter = cell_diameter      # Diameter of cell (µm)
 
@@ -717,7 +760,7 @@ class Column_Scaffold:
             :return: Returns a data list detailing various properties of the cell including the current simulation time,
             its unique cell ID, the number of moves it has made, and its X, Y, and Z position in the scaffold.
             """
-            return [current_time, self.ID, self.generation, self.moves_made,
+            return [current_time, self.ID, self.generation, self.h_moves_made, self.v_moves_made,
                     round(pore_array[self.x], 3),
                     round(pore_array[self.y], 3),
                     round(column_array[self.z], 3)]
