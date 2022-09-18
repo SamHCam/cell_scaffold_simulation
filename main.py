@@ -39,6 +39,10 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     # Stores data in rows in an expandable list
     data = []
 
+    # Write scaffold column segment height and column spacing for analysis use
+    write_data([["Column Segment Height (µm):", scaffold.get_column_segment_height(),
+                 "Column Spacing(µm):", scaffold.get_column_spacing()]])
+
     # Writes the header information to the top of the CSV
     write_data(header, file_name)
 
@@ -82,7 +86,8 @@ ligand_factor = 100                 # Percentage of ligands compared to normal (
 pore_size = 23.9                    # Diameter of pores in the scaffold (µm)
 packing_density = 80                # Fraction of void or empty volume within the scaffold that can be occupied by
                                     # cells (%)
-pore_layer_count = 30               # The number of layers to represent each pore column
+pore_layer_count = 120               # The number of layers to represent each pore column
+tuning_factor = 1E6
 
 # Cell parameters:
 cell_diameter = 35                  # Cell diameter (µm)
@@ -91,9 +96,9 @@ replication_probability = 7.72E-06  # Fixed probability that a cell will replica
 
 # Simulation Parameters:
 simulation_time = 504               # Total simulation time (hour)
-writing_frequency = 20              # Frequency of how often the program writes all stored data to the
+writing_frequency = 2              # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
-recording_frequency = 20            # Frequency of how often the program records data (hours/record to data list)
+recording_frequency = 2            # Frequency of how often the program records data (hours/record to data list)
 
 # Header Information
 csv_file_name = "Sim_" + str(scaffold_stiffness) + "MPa_" + str(pore_size) + "PDµm_" + str(
@@ -108,7 +113,7 @@ file_header = [["Time (hour)", "Cell ID", "Cell Generation", "# of Horizontal Ce
 # Generates a scaffold based on specified parameters in "Simulation and Scaffold Characteristics"
 scaffold_1 = column_scaffold.Column_Scaffold(dimension, porosity / 100, pore_size, packing_density / 100,
                                                 cell_diameter, scaffold_stiffness * 10 ** 6, ligand_factor / 100,
-                                                pore_layer_count)
+                                                pore_layer_count, tuning_factor)
 
 # --------------------------------------------------------------------------
 # Run Simulation

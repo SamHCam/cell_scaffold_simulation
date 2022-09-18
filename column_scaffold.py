@@ -6,7 +6,7 @@ import random as r
 
 class Column_Scaffold:
     def __init__(self, dimension, porosity, pore_diameter, packing_density, cell_diameter, scaffold_stiffness,
-                 ligand_factor, pore_column_layers):
+                 ligand_factor, pore_column_layers, tuning_factor):
         """Seven parameter constructor that defines a scaffold utilizing individual spherical pores.
 
         :param dimension: side dimension of cubical scaffold (µm).
@@ -49,6 +49,8 @@ class Column_Scaffold:
                                                             # scaffold (µm)
         self.__scaffold_stiffness = scaffold_stiffness      # The scaffold stiffness (Pa)
         self.__ligand_factor = ligand_factor                # The percent of normal ligand percentage (%)
+        self.__tuning_factor = tuning_factor                # Adjusts the effect of crowding on cell migration; a higher
+                                                            # value represents a larger effect
 
         # Arrays
         self.__pore_array = pore_array                      # An array that represents the coordinates of each
@@ -111,6 +113,14 @@ class Column_Scaffold:
     def get_time(self):
         """Returns the scaffold's current time"""
         return self.__time
+
+    def get_column_spacing(self):
+        """Returns the spacing between scaffolds (µm)"""
+        return self.__column_spacing
+
+    def get_column_segment_height(self):
+        """Returns the height of column segments"""
+        return self.__pore_segment_height
 
     # --------------------------------------------------------------------------
     # Public Methods
@@ -213,12 +223,8 @@ class Column_Scaffold:
         # Generate seeded cell objects
         self.cell_objs = [self.Cell(self.__cell_diameter, self.__time) for i in range(seeded_cell_count)]
 
-        # Find end index and middle index
-        end_point = len(self.__pore_array) - 1
-        center_point = end_point/2
-
         # Determine a seeding radius
-        radius = int(3 * (end_point - center_point) / 4)
+        seeding_radius = 3500
 
         count = 0
         # Seed each cell object
@@ -238,9 +244,9 @@ class Column_Scaffold:
                 rand_theta = r.randint(0, 100)/100 * 2 * math.pi
 
                 # Generate random position at the top of the scaffold
-                new_position = [int(center_point + rand_radius * math.cos(rand_theta)),
+                new_position = [int(self.__scaffold_center_index + rand_radius * math.cos(rand_theta)),
                                 int(center_point + rand_radius * math.sin(rand_theta)),
-                                r.randint(len(self.__column_array) - 10, len(self.__column_array) - 1)]
+                                r.randint(self.__pore_column_layers - 6, self.__pore_column_layers - 1)]
 
                 # Check if random position is full
                 pore_destination = self.scaffold[new_position[0]][new_position[1]][new_position[2]]
@@ -347,7 +353,7 @@ class Column_Scaffold:
             new_x_pos = self.__pore_array[new_x] - center_pos
             new_y_pos = self.__pore_array[new_y] - center_pos
 
-            cell_radius_position = abs(np.sqrt(new_x**2 + new_y**2))
+            cell_radius_position = np.sqrt(new_x**2 + new_y**2)
 
             # Check if cell radius position is within scaffold bounds
             if cell_radius_position > self.__scaffold_radius:
@@ -557,8 +563,8 @@ class Column_Scaffold:
         available_area = 0
         next_pore = \
             self.scaffold[cell.x + x_inc][cell.y + y_inc][cell.z + z_inc]
-        if next_pore.surface_area < 1E6 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter):
-            available_area = next_pore.surface_area/(1E6 * next_pore.calculate_cell_adhesion_area(self.__cell_diameter))
+        if next_pore.surface_area < self.__tuning_factor * next_pore.calculate_cell_adhesion_area(self.__cell_diameter):
+            available_area = next_pore.surface_area/(self.__tuning_factor * next_pore.calculate_cell_adhesion_area(self.__cell_diameter))
         else:
             available_area = 1
 
@@ -575,7 +581,7 @@ class Column_Scaffold:
         f_traction = c2 * ligand_num
 
         # Force Hydrostatic
-        rho = 997   # Density of medium (kg/m^3)
+        rho = 1008   # Density of medium (kg/m^3)
         g = 9.8     # Acceleration of gravity (m/s^2)
         h_cell = self.__column_array[cell.z]                                # Z-position of cell (µm)
         h_scaffold = self.__dimension                                       # Height of scaffold (µm)
@@ -586,7 +592,7 @@ class Column_Scaffold:
         # Force of Drag Calculation
         c = 6 * np.pi * self.__cell_diameter/2      # Constant c depends on the shape of a cell for a spherical cell
                                                     # in a infinitely viscous medium
-        eta = 55                                    # Viscosity (poise or Pa-s)
+        eta = 1.035E-3                              # Viscosity (poise or Pa-s)
 
         # Calculation of cell speed based on velocity
         traction_hydrostatic = 0
