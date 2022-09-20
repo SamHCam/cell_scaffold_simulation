@@ -150,7 +150,7 @@ class Column_Scaffold:
             # If all pores, including the pore the cell is in, are full then no movement and no replication occurs
             if n_cap[0] and n_cap[1] and n_cap[2] and n_cap[3] and n_cap[4] and n_cap[5] and n_cap[6]:
                 # Writes cell properties to data list
-                if t % rf == 0 or t == tf:
+                if t % rf == 0 or t == tf or t < 48:
                     data.append(cell.write_data(self.__pore_array, self.__column_array, t))
 
             else:
@@ -162,7 +162,7 @@ class Column_Scaffold:
                     # Replicate only if replication number matches
                     if rp != 1:
                         # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
+                        if t % rf == 0 or t == tf or t < 48:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
 
                     # Replication of cell occurs if replication condition is achieved
@@ -175,7 +175,7 @@ class Column_Scaffold:
                         self.__add_new_cell(new_daughter_cell)
 
                         # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
+                        if t % rf == 0 or t == tf or t < 48:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                             data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
 
@@ -190,7 +190,7 @@ class Column_Scaffold:
                     # Replicate only if replication number matches
                     if rp != 1:
                         # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
+                        if t % rf == 0 or t == tf or t < 48:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                     else:
                         # Generate a new daughter cell and perform migration on it
@@ -203,7 +203,7 @@ class Column_Scaffold:
                             self.__add_new_cell(new_daughter_cell)
 
                         # Writes cell properties to data list
-                        if t % rf == 0 or t == tf:
+                        if t % rf == 0 or t == tf or t < 48:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                             # Write daughter cell properties to data list only if it exists
                             if new_daughter_cell.h_moves_made != 0 or new_daughter_cell.v_moves_made != 0:

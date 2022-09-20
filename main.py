@@ -97,9 +97,9 @@ replication_probability = 7.72E-06  # Fixed probability that a cell will replica
 
 # Simulation Parameters:
 simulation_time = 504               # Total simulation time (hour)
-writing_frequency = 2              # Frequency of how often the program writes all stored data to the
+writing_frequency = 24              # Frequency of how often the program writes all stored data to the
                                     # CSV (hours/write to file)
-recording_frequency = 2            # Frequency of how often the program records data (hours/record to data list)
+recording_frequency = 24            # Frequency of how often the program records data (hours/record to data list)
 
 # Header Information
 csv_file_name = "Sim_" + str(scaffold_stiffness) + "MPa_" + str(pore_size) + "PDµm_" + str(
