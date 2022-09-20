@@ -29,9 +29,10 @@ class Column_Scaffold:
         # Generate scaffold characteristics
         # --------------------------------------------------------------------------
         # Generates various scaffold characteristics from method parameters
-        pore_array, pore_column_segments, pore_cell_max, scaffold_cell_max, column_array, pore_columns, seg_height = \
+        pore_array, pore_column_segments, pore_cell_max, scaffold_cell_max, column_array, pore_columns, seg_height, \
+        column_spacing = \
             self.__generate_pore_scaffold_properties(dimension, porosity, pore_diameter, packing_density, cell_diameter,
-                                                     pore_column_layers, column_spacing)
+                                                     pore_column_layers)
 
         # Column properties
         self.__pore_columns = pore_columns                  # Number of columns used to represent the scaffold
@@ -51,14 +52,13 @@ class Column_Scaffold:
         self.__ligand_factor = ligand_factor                # The percent of normal ligand percentage (%)
         self.__tuning_factor = tuning_factor                # Adjusts the effect of crowding on cell migration; a higher
                                                             # value represents a larger effect
-
         # Arrays
         self.__pore_array = pore_array                      # An array that represents the coordinates of each
                                                             # pore in the X and Y directions
         self.__column_array = column_array                  # An array that represents the coordinates of each
                                                             # pore segment in the Z directions
         self.__scaffold_center_index = \
-            int((self.__scaffold_height % self.__column_spacing)/2) # Center index of scaffold
+            int(self.__scaffold_radius / self.__column_spacing) # Center index of scaffold
 
         # Crowding conditions
         self.__pore_cell_max = pore_cell_max                # The maximum number of cells one pore segment in the
@@ -75,8 +75,6 @@ class Column_Scaffold:
                            for z in range(pore_column_layers)]
                           for y in range(len(pore_array))]
                          for x in range(len(pore_array))]
-
-        self.__x_bound, self.__y_bound = self.__calcualte_scaffold_bounds
 
         # --------------------------------------------------------------------------
         # Initializes and stores cell objects that are in the scaffold
@@ -201,14 +199,14 @@ class Column_Scaffold:
                         self.__cell_migration(new_daughter_cell, daughter_n_cap, ts, True)
 
                         # Replicated cell must migrate to exist
-                        if new_daughter_cell.moves_made != 0:
+                        if new_daughter_cell.h_moves_made != 0 or new_daughter_cell.v_moves_made != 0:
                             self.__add_new_cell(new_daughter_cell)
 
                         # Writes cell properties to data list
                         if t % rf == 0 or t == tf:
                             data.append(cell.write_data(self.__pore_array, self.__column_array, t))
                             # Write daughter cell properties to data list only if it exists
-                            if new_daughter_cell.moves_made != 0:
+                            if new_daughter_cell.h_moves_made != 0 or new_daughter_cell.v_moves_made != 0:
                                 data.append(new_daughter_cell.write_data(self.__pore_array, self.__column_array, t))
 
     # --------------------------------------------------------------------------
@@ -224,7 +222,7 @@ class Column_Scaffold:
         self.cell_objs = [self.Cell(self.__cell_diameter, self.__time) for i in range(seeded_cell_count)]
 
         # Determine a seeding radius
-        seeding_radius = 3500
+        seeding_radius = 7000
 
         count = 0
         # Seed each cell object
@@ -240,12 +238,14 @@ class Column_Scaffold:
             # Random seed cells by generating random positions, writes its properties to the data list
             while True:
                 # Generate a random radius and angle
-                rand_radius = radius * math.sqrt(r.randint(0, 100)/100)
+                rand_radius = seeding_radius * math.sqrt(r.randint(0, 100)/100)
                 rand_theta = r.randint(0, 100)/100 * 2 * math.pi
 
                 # Generate random position at the top of the scaffold
-                new_position = [int(self.__scaffold_center_index + rand_radius * math.cos(rand_theta)),
-                                int(center_point + rand_radius * math.sin(rand_theta)),
+                new_position = [int(self.__scaffold_center_index +
+                                    (rand_radius * math.cos(rand_theta))/self.__column_spacing),
+                                int(self.__scaffold_center_index +
+                                    (rand_radius * math.sin(rand_theta))/self.__column_spacing),
                                 r.randint(self.__pore_column_layers - 6, self.__pore_column_layers - 1)]
 
                 # Check if random position is full
@@ -336,16 +336,16 @@ class Column_Scaffold:
 
     def __check_scaffold_bounds(self, x_tic, y_tic, z_tic, cell_to_check):
         # Increment/decrement cell position appropriately
-        new_x = cell_to_check + x_tic
-        new_y = cell_to_check + y_tic
-        new_z = cell_to_check + z_tic
+        new_x = cell_to_check.x + x_tic
+        new_y = cell_to_check.y + y_tic
+        new_z = cell_to_check.z + z_tic
 
         # Check for negative index
         if new_x < 0 or new_y < 0 or new_z < 0:
-            return False
+            return True
         # Check if Z is out of bounds
-        elif self.__column_array[new_z] > self.__scaffold_height:
-            return False
+        elif new_z * self.__pore_segment_height > self.__scaffold_height:
+            return True
         # Check if X and Y is out of bounds
         else:
             # Calculate centered X and Y positions
@@ -357,9 +357,9 @@ class Column_Scaffold:
 
             # Check if cell radius position is within scaffold bounds
             if cell_radius_position > self.__scaffold_radius:
-                return false
-        # Cell within bounds, return true
-        return true
+                return True
+        # Cell within bounds, return false
+        return False
 
     @staticmethod
     def __generate_replication_rate_number(rep_rate):
@@ -586,7 +586,7 @@ class Column_Scaffold:
         h_cell = self.__column_array[cell.z]                                # Z-position of cell (µm)
         h_scaffold = self.__dimension                                       # Height of scaffold (µm)
 
-        f_hydrostatic = rho * g * (h_scaffold - h_cell) * 1E-6 * np.pi * (self.__pore_diameter/2)**2  # Hydrostatic Force (pN)
+        f_hydrostatic = 0 # rho * g * (h_scaffold - h_cell) * 1E-6 * np.pi * (self.__pore_diameter/2)**2  # Hydrostatic Force (pN)
         # print(f_hydrostatic)
 
         # Force of Drag Calculation
@@ -652,37 +652,37 @@ class Column_Scaffold:
         neighbor_conditions = [False, False, False, False, False, False, False]
 
         # Check +X direction
-        if self.__check_scaffold_bounds(1, 0, 0) and cell_to_check.z == 0:
+        if self.__check_scaffold_bounds(1, 0, 0, cell_to_check) or cell_to_check.z != 0:
             neighbor_conditions[0] = True
         else:
             neighbor_conditions[0] = self.scaffold[cell_to_check.x + 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check -X direction
-        if self.__check_scaffold_bounds(-1, 0, 0) and cell_to_check.z == 0:
+        if self.__check_scaffold_bounds(-1, 0, 0, cell_to_check) or cell_to_check.z != 0:
             neighbor_conditions[1] = True
         else:
             neighbor_conditions[1] = self.scaffold[cell_to_check.x - 1][cell_to_check.y][cell_to_check.z].is_full()
 
         # Check +Y direction
-        if self.__check_scaffold_bounds(0, 1, 0) and cell_to_check.z == 0:
+        if self.__check_scaffold_bounds(0, 1, 0, cell_to_check) or cell_to_check.z != 0:
             neighbor_conditions[2] = True
         else:
             neighbor_conditions[2] = self.scaffold[cell_to_check.x][cell_to_check.y + 1][cell_to_check.z].is_full()
 
         # Check -Y direction
-        if self.__check_scaffold_bounds(0, -1, 0) and cell_to_check.z == 0:
+        if self.__check_scaffold_bounds(0, -1, 0, cell_to_check) or cell_to_check.z != 0:
             neighbor_conditions[3] = True
         else:
             neighbor_conditions[3] = self.scaffold[cell_to_check.x][cell_to_check.y - 1][cell_to_check.z].is_full()
 
         # Check +Z direction
-        if self.__check_scaffold_bounds(0, 0, 1):
+        if self.__check_scaffold_bounds(0, 0, 1, cell_to_check):
             neighbor_conditions[4] = True
         else:
             neighbor_conditions[4] = self.scaffold[cell_to_check.x][cell_to_check.y][cell_to_check.z + 1].is_full()
 
         # Check -Z direction
-        if self.__check_scaffold_bounds(0, 0, -1):
+        if self.__check_scaffold_bounds(0, 0, -1, cell_to_check):
             neighbor_conditions[5] = True
         else:
             neighbor_conditions[5] = self.scaffold[cell_to_check.x][cell_to_check.y][cell_to_check.z - 1].is_full()

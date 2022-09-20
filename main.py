@@ -41,7 +41,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 
     # Write scaffold column segment height and column spacing for analysis use
     write_data([["Column Segment Height (µm):", scaffold.get_column_segment_height(),
-                 "Column Spacing(µm):", scaffold.get_column_spacing()]])
+                 "Column Spacing(µm):", scaffold.get_column_spacing()]], file_name)
 
     # Writes the header information to the top of the CSV
     write_data(header, file_name)
@@ -55,6 +55,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
     # Initiation of time step simulation until specified simulation end-time
     while time <= time_final:
         print("Simulation Time: ", time)  # TODO: Remove, testing purposes only
+        print("Cell Count: ", scaffold.get_cell_count())
 
         # Migration and replication of all cells in the designated scaffold
         scaffold.migration_replication(data, time_step, time_final, rf,
@@ -79,7 +80,7 @@ def simulation(header, file_name, scaffold, seeded_cell_count, ts, time_final, w
 time_step = 0.25  # Time "Step" forward each time to perform migration and/or replication (hour)
 
 # Scaffold Parameters:
-dimension = 20000                   # Side length of cubical Scaffold (µm)
+dimension = 21000                   # Side length of cubical Scaffold (µm)
 porosity = 42.1                     # Measure of void or "empty" volume in scaffold (%)
 scaffold_stiffness = 120            # Scaffold Stiffness (MPa)
 ligand_factor = 100                 # Percentage of ligands compared to normal (%)
