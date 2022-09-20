@@ -586,7 +586,7 @@ class Column_Scaffold:
         h_cell = self.__column_array[cell.z]                                # Z-position of cell (µm)
         h_scaffold = self.__dimension                                       # Height of scaffold (µm)
 
-        f_hydrostatic = 0 # rho * g * (h_scaffold - h_cell) * 1E-6 * np.pi * (self.__pore_diameter/2)**2  # Hydrostatic Force (pN)
+        f_hydrostatic = rho * g * (h_scaffold - h_cell) * 1E-6 * np.pi * (self.__pore_diameter/2)**2  # Hydrostatic Force (pN)
         # print(f_hydrostatic)
 
         # Force of Drag Calculation
